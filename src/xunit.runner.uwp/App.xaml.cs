@@ -27,7 +27,9 @@ namespace XunitUwpRunner
         private async void RunTests(string arguments)
         {
             var reporters = await GetAvailableRunnerReporters();
-            var commandLine = CommandLine.Parse(reporters, arguments.Split(new[] { '\x1F' }, StringSplitOptions.RemoveEmptyEntries));
+            //string[] args = arguments.Split(new[] { '\x1F' }, StringSplitOptions.RemoveEmptyEntries);
+            string[] args = { "Microsoft.CSharp.Tests.dll" };
+            var commandLine = CommandLine.Parse(reporters, args);
             if (commandLine.Debug)
             {
                 Debugger.Launch();
@@ -106,8 +108,9 @@ namespace XunitUwpRunner
 
         static async Task WriteResults(XElement data)
         {
+            string fname = "testResults.xml";
             var folder = Windows.Storage.ApplicationData.Current.LocalFolder;
-            var file = await folder.CreateFileAsync("results.xml", Windows.Storage.CreationCollisionOption.ReplaceExisting);
+            var file = await folder.CreateFileAsync(fname, Windows.Storage.CreationCollisionOption.ReplaceExisting);
             using (var stream = await file.OpenStreamForWriteAsync())
             {
                 data.Save(stream);
@@ -123,39 +126,39 @@ namespace XunitUwpRunner
             var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
             var candidates = files.Where(f => f.Name.EndsWith("dll") || f.Name.EndsWith("exe")).Select(f => f.Name);
 
-            foreach (var dllFile in candidates)
-            {
-                Type[] types;
+            //foreach (var dllFile in candidates)
+            //{
+            //    Type[] types;
 
-                try
-                {
-                    var assembly = Assembly.Load(new AssemblyName { Name = dllFile });
-                    types = assembly.GetTypes();
-                }
-                catch (ReflectionTypeLoadException ex)
-                {
-                    types = ex.Types;
-                }
-                catch
-                {
-                    continue;
-                }
+            //    try
+            //    {
+            //        var assembly = Assembly.Load(new AssemblyName { Name = dllFile });
+            //        types = assembly.GetTypes();
+            //    }
+            //    catch (ReflectionTypeLoadException ex)
+            //    {
+            //        types = ex.Types;
+            //    }
+            //    catch
+            //    {
+            //        continue;
+            //    }
 
-                foreach (var type in types)
-                {
-                    if (type == null || type == typeof(DefaultRunnerReporter) || !type.GetInterfaces().Any(t => t == typeof(IRunnerReporter)))
-                    {
-                        continue;
-                    }
-                    var ctor = type.GetConstructor(new Type[0]);
-                    if (ctor == null)
-                    {
-                        continue;
-                    }
+            //    foreach (var type in types)
+            //    {
+            //        if (type == null || type == typeof(DefaultRunnerReporter) || !type.GetInterfaces().Any(t => t == typeof(IRunnerReporter)))
+            //        {
+            //            continue;
+            //        }
+            //        var ctor = type.GetConstructor(new Type[0]);
+            //        if (ctor == null)
+            //        {
+            //            continue;
+            //        }
 
-                    result.Add((IRunnerReporter)ctor.Invoke(new object[0]));
-                }
-            }
+            //        result.Add((IRunnerReporter)ctor.Invoke(new object[0]));
+            //    }
+            //}
 
             return result;
         }

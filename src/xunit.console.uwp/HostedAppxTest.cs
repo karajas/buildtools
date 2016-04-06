@@ -24,17 +24,21 @@ namespace Xunit.UwpClient
         private string manifestPath = null;
         private string appUserModelId = null;
 
-        public HostedAppxTest(string[] args, XunitProject project, string runnerAppxPath)
+        private string InstallLocation = null;
+
+        public HostedAppxTest(string[] args, XunitProject project, string runnerAppxPath, string installPath)
         {
             this.originalArgs = args;
             this.project = project;
             this.runnerAppxPath = runnerAppxPath;
+            this.InstallLocation = installPath;
         }
 
         public void Setup()
         {
-            tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-            Directory.CreateDirectory(tempDir);
+            tempDir = InstallLocation;
+            if(!Directory.Exists(tempDir))
+                Directory.CreateDirectory(tempDir);
             object appxFactoryRet;
             NativeMethods.CoCreateInstance(Guids.AppxFactory, null, NativeMethods.CLSCTX_INPROC_SERVER, Guids.IAppxFactory, out appxFactoryRet);
             var appxFactory = (IAppxFactory)appxFactoryRet;
@@ -65,6 +69,7 @@ namespace Xunit.UwpClient
                     }
                 }
                 argsToPass = string.Join("\x1F", originalArgs.Where(s => !s.ToLowerInvariant().EndsWith(".appx")).Concat(payloadFiles).ToArray());
+                Console.WriteLine("moreconsoledebug1: "+ argsToPass);
                 CopyXunitDlls(this.runnerAppxPath, this.tempDir);
                 SetupManifestForXunit(manifestPath);
             }
@@ -73,11 +78,13 @@ namespace Xunit.UwpClient
                 RecurseCopy(Path.GetDirectoryName(runnerAppxPath), tempDir);
                 foreach (var a in project.Assemblies)
                 {
+                    Console.WriteLine("consoledebug: "+a.AssemblyFilename);
                     File.Copy(a.AssemblyFilename, Path.Combine(tempDir, Path.GetFileName(a.AssemblyFilename)), true);
                 }
                 manifestPath = Path.Combine(tempDir, "AppxManifest.xml");
                 GetManifestInfoFromFile(appxFactory, manifestPath);
                 argsToPass = string.Join("\x1F", originalArgs);
+                Console.WriteLine("moreconsoledebug1: " + argsToPass);
             }
             RegisterAppx(new Uri(manifestPath));
         }
@@ -114,18 +121,23 @@ namespace Xunit.UwpClient
             {
                 p.Kill();
             }
-            var resultPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "results.xml");
-            File.Copy(resultPath, Path.GetFileName(resultPath));
+            var resultPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "testResults.xml");
+            //string place = Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(resultPath));
+            //if (File.Exists(Path.GetFileName(resultPath)))
+            //{
+            //    Console.WriteLine("location: "+ place);
+            //    File.Delete(place);
+            //}
+            File.Copy(resultPath, Path.Combine(InstallLocation, Path.GetFileName(resultPath)), true);
         }
 
         public void Cleanup()
         {
             var packageManager = new PackageManager();
-            var result = packageManager.RemovePackageAsync(packageFullName);
+            var result = packageManager.RemovePackageAsync(packageFullName, RemovalOptions.PreserveApplicationData);
             var completed = new AutoResetEvent(false);
             result.Completed = (waitResult, status) => completed.Set();
             completed.WaitOne();
-            Directory.Delete(tempDir, true);
         }
 
         private void SetupManifestForXunit(string manifestPath)
@@ -142,6 +154,7 @@ namespace Xunit.UwpClient
             File.Copy(runnerAppxPath, Path.Combine(destination, Path.GetFileName(runnerAppxPath)));
             foreach (var f in Directory.GetFiles(Path.GetDirectoryName(runnerAppxPath), "xunit*"))
             {
+                Console.WriteLine("moreconsoledebug2: " + f);
                 if (!File.Exists(Path.Combine(destination, Path.GetFileName(f))))
                 {
                     File.Copy(f, Path.Combine(destination, Path.GetFileName(f)));

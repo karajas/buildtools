@@ -18,7 +18,7 @@ namespace Xunit.UwpClient
 {
     public class Program
     {
-        private const string runnerPath = @"app\XunitUwpRunner.exe";
+        private const string runnerPath = @"..\xunit.runner.uwp\XunitUwpRunner.exe";
 
         [STAThread]
         public static int Main(string[] args)
@@ -37,7 +37,9 @@ namespace Xunit.UwpClient
                 if (!commandLine.NoLogo)
                     PrintHeader();
 
-                var test = new HostedAppxTest(args, commandLine.Project, runnerPath);
+                string installLocation = @"D:\Scratch\uwp";
+
+                var test = new HostedAppxTest(args, commandLine.Project, runnerPath, installLocation);
 
                 try
                 {
