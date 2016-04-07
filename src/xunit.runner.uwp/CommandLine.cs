@@ -131,7 +131,11 @@ namespace Xunit.ConsoleClient
 
                 optionName = optionName.Substring(1);
 
-                if (optionName == "nologo")
+                if (optionName == "installlocation")
+                {
+                    continue;
+                }
+                else if (optionName == "nologo")
                 {
                     GuardNoOptionValue(option);
                     NoLogo = true;

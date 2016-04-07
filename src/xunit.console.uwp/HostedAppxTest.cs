@@ -75,7 +75,7 @@ namespace Xunit.UwpClient
             }
             else
             {
-                RecurseCopy(Path.GetDirectoryName(runnerAppxPath), tempDir);
+                RecurseCopy(Path.GetDirectoryName(Path.GetFullPath(runnerAppxPath)), Path.GetFullPath(tempDir));
                 foreach (var a in project.Assemblies)
                 {
                     Console.WriteLine("consoledebug: "+a.AssemblyFilename);
@@ -122,13 +122,9 @@ namespace Xunit.UwpClient
                 p.Kill();
             }
             var resultPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "testResults.xml");
-            //string place = Path.Combine(Directory.GetCurrentDirectory(), Path.GetFileName(resultPath));
-            //if (File.Exists(Path.GetFileName(resultPath)))
-            //{
-            //    Console.WriteLine("location: "+ place);
-            //    File.Delete(place);
-            //}
+            var logsPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "logs.txt");
             File.Copy(resultPath, Path.Combine(InstallLocation, Path.GetFileName(resultPath)), true);
+            File.Copy(resultPath, Path.Combine(InstallLocation, Path.GetFileName(logsPath)), true);
         }
 
         public void Cleanup()

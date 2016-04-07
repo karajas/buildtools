@@ -18,13 +18,14 @@ namespace Xunit.UwpClient
 {
     public class Program
     {
-        private const string runnerPath = @"..\xunit.runner.uwp\XunitUwpRunner.exe";
+        private const string runnerPath = @"app\XunitUwpRunner.exe";
 
         [STAThread]
         public static int Main(string[] args)
         {
             try
             {
+                //args = new[] { "Microsoft.CSharp.Tests.dll", "-installlocation",  @"D:\Scratch\uwprun1\3a4cde0e-a110-4a3d-99ab-b6b423abe2b0\Work\51074aa9-5506-4b00-98be-39d8675ec56c\Exec" };
                 if (args.Length == 0 || args[0] == "-?")
                 {
                     PrintHeader();
@@ -34,10 +35,9 @@ namespace Xunit.UwpClient
 
                 var commandLine = CommandLine.Parse(args);
 
-                if (!commandLine.NoLogo)
-                    PrintHeader();
+                if (!commandLine.NoLogo) PrintHeader();
 
-                string installLocation = @"D:\Scratch\uwp";
+                string installLocation = commandLine.InstallLocation;
 
                 var test = new HostedAppxTest(args, commandLine.Project, runnerPath, installLocation);
 
@@ -50,7 +50,7 @@ namespace Xunit.UwpClient
                 {
                     test.Cleanup();
                 }
-                
+
                 if (commandLine.Wait)
                 {
                     Console.WriteLine();
@@ -91,6 +91,9 @@ namespace Xunit.UwpClient
             Console.WriteLine($"usage: {executableName} <assemblyFile> [configFile] [assemblyFile [configFile]...] [options] [reporter] [resultFormat filename [...]]");
             Console.WriteLine();
             Console.WriteLine("Note: Configuration files must end in .json (for JSON) or .config (for XML)");
+            Console.WriteLine();
+            Console.WriteLine("Console Runner options:");
+            Console.WriteLine("  -installlocation                : path to install application");
             Console.WriteLine();
             Console.WriteLine("Valid options:");
             Console.WriteLine("  -nologo                : do not show the copyright message");

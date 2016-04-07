@@ -28,6 +28,7 @@ namespace Xunit.UwpClient
         public XunitProject Project { get; protected set; }
 
         public bool Wait { get; protected set; }
+        public string InstallLocation { get; internal set; }
 
         protected virtual string GetFullPath(string fileName)
         {
@@ -110,6 +111,13 @@ namespace Xunit.UwpClient
 
                 optionName = optionName.Substring(1);
 
+                
+                if (optionName == "installlocation")
+                {
+                    if (option.Value == null)
+                        throw new ArgumentException("missing argument for -installlocation");
+                    InstallLocation = option.Value;
+                }
                 if (optionName == "nologo")
                 {
                     GuardNoOptionValue(option);

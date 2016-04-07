@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
-	<PlatformTarget Condition=" '$(PlatformTarget)' == '' ">x86</PlatformTarget>
+    <PlatformTarget Condition=" '$(PlatformTarget)' == '' ">x86</PlatformTarget>
     <ProjectGuid>{BB960A1D-DE0B-43F5-ACA1-0BDEA8E63CDD}</ProjectGuid>
     <OutputType>AppContainerExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -48,7 +48,7 @@
     <Compile Include="XmlAggregateVisitor.cs" />
     <Compile Include="..\Common\XmlTestExecutionVisitor.cs">
       <Link>Common\XmlTestExecutionVisitor.cs</Link>
-	</Compile>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -75,6 +75,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Console">
+      <HintPath>..\..\packages\System.Console\4.0.0-beta-23123\ref\dotnet\System.Console.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
