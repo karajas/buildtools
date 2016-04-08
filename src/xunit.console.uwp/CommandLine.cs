@@ -78,8 +78,6 @@ namespace Xunit.UwpClient
                 var assemblyFile = arguments.Pop();
                 if (IsConfigFile(assemblyFile))
                     throw new ArgumentException($"expecting assembly, got config file: {assemblyFile}");
-                if (!fileExists(assemblyFile))
-                    throw new ArgumentException($"file not found: {assemblyFile}");
 
                 string configFile = null;
                 if (arguments.Count > 0)

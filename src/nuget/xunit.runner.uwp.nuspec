@@ -20,11 +20,17 @@
     <dependencies>
       <dependency id="xunit" version="2.1.0" />
       <dependency id="xunit.runner.utility" version="2.1.0" />
+	  <dependency id="Microsoft.NETCore.UniversalWindowsPlatform" version="5.0.0" />
     </dependencies>
   </metadata>
   <files>
     <!-- xunit runner for UWP -->
-    <file src="xunit.runner.uwp\**\*.*" target="app" />
+    <file src="xunit.runner.uwp\**\*.exe" target="lib\dotnet" />
+    <file src="xunit.runner.uwp\**\*.xml" target="lib\dotnet" />
+    <file src="xunit.runner.uwp\**\*.xbf" target="lib\dotnet" />
+    <file src="xunit.runner.uwp\**\*.pri" target="lib\dotnet" />
+    <file src="xunit.runner.uwp\**\*.pdb" target="lib\dotnet" />
+    <file src="xunit.runner.uwp\**\*.appxrecipe" target="lib\dotnet" />
     <file src="xunit.console.uwp\**\*.*" target="" />
   </files>
   

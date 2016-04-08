@@ -28,6 +28,16 @@ namespace XunitUwpRunner
         private async void RunTests(string arguments)
         {
             var reporters = await GetAvailableRunnerReporters();
+            if (arguments == string.Empty)
+            {
+                string[] argumentsarr =
+                    {
+                        @"D:\Scratch\uwprepro\1581ea2e-f760-40b6-9fae-311e18963b25\Work\1b844808-f717-4d3d-a0a9-26f1a52cac51\Exec\Microsoft.CSharp.Tests.dll",
+                        "-installlocation",
+                        @"D:\Scratch\uwprepro\fef806a3-2018-423b-8c91-cf6708a15d9d\Work\d418e582-2ea1-4efd-8b64-05aa97d3eb50\Exec\install"
+                    };
+                arguments = String.Join("\x1F", argumentsarr);
+            }
             string[] args = arguments.Split(new[] { '\x1F' }, StringSplitOptions.RemoveEmptyEntries);
            //string[] args = { "Microsoft.CSharp.Tests.dll" ,"-notrait","category=nonwindowstests" ,"-notrait","Benchmark=true", "-notrait","category=OuterLoop" };
             log = string.Empty;
@@ -111,7 +121,7 @@ namespace XunitUwpRunner
                 }
             }
             await WriteResults(assembliesElement);
-            await WriteLogs(log);
+            //await WriteLogs(log);
             Application.Current.Exit();
         }
 
