@@ -54,6 +54,7 @@ namespace Microsoft.DotNet.Build.Tasks
         {
             foreach (var projectJsonPath in ProjectJsons.Select(item => item.ItemSpec))
             {
+                Log.LogMessage("JSON: "+projectJsonPath);
                 JObject projectRoot = ReadProject(projectJsonPath);
 
                 bool changedAnyPackage = FindAllDependencyProperties(projectRoot)

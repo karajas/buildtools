@@ -9,7 +9,7 @@
 
     <!-- These should be set by importing the targets below but initializing to 0 for consistency -->
     <BuildNumberMajor Condition="'$(BuildNumberMajor)' == ''">0</BuildNumberMajor>
-    <BuildNumberMinor Condition="'$(BuildNumberMinor)' == ''">00</BuildNumberMinor>
+    <BuildNumberMinor Condition="'$(BuildNumberMinor)' == ''">0</BuildNumberMinor>
   </PropertyGroup>
 
   <!-- Import a build target that includes the build numbers -->
@@ -127,6 +127,7 @@
   <Target Name="GenerateVersionHeader"
       Inputs="$(MSBuildProjectFile)"
       Outputs="$(NativeVersionHeaderFile)"
+      DependsOnTargets="CreateVersionFileDuringBuild"
       Condition="'$(NativeVersionHeaderFile)'!='' and '$(GenerateVersionHeader)'=='true'">
 
     <ItemGroup>
@@ -171,6 +172,7 @@
       <CurrentVersionLines Include="%3CProject xmlns=%22http://schemas.microsoft.com/developer/msbuild/2003%22%3E" />
       <CurrentVersionLines Include="%3CPropertyGroup%3E" />
       <CurrentVersionLines Include="%3CBuildNumberMajor Condition=%22%27%24(BuildNumberMajor)%27==%27%27%22%3E$(GeneratedBuildNumberMajor)%3C/BuildNumberMajor%3E" />
+      <CurrentVersionLines Include="%3CBuildNumberMinor Condition=%22%27%24(BuildNumberMinor)%27==%27%27%22%3E$(GeneratedBuildNumberMinor)%3C/BuildNumberMinor%3E" />
       <CurrentVersionLines Include="%3C/PropertyGroup%3E" />
       <CurrentVersionLines Include="%3C/Project%3E" />
     </ItemGroup>
@@ -201,11 +203,12 @@
       <!-- Padding should be equal or greater to 5. Using 5 to align with internal build system. -->
       <VersionPadding Condition="'$(VersionPadding)'==''">5</VersionPadding>
       <!-- Using the following default comparison date will produce versions that align with our internal build system. -->
-      <VersionComparisonDate Condition="'$(VersionComparisonDate)'==''">1996-04-01 00:00:00 Z</VersionComparisonDate>
+      <VersionComparisonDate Condition="'$(VersionComparisonDate)'==''">1996-04-01</VersionComparisonDate>
     </PropertyGroup>
       
-    <GenerateCurrentVersion SeedDate="$(VersionSeedDate)">
+    <GenerateCurrentVersion SeedDate="$(VersionSeedDate)" OfficialBuildId="$(OfficialBuildId)" ComparisonDate="$(VersionComparisonDate)" Padding="$(VersionPadding)">
       <Output PropertyName="GeneratedBuildNumberMajor" TaskParameter="GeneratedVersion" />
+      <Output PropertyName="GeneratedBuildNumberMinor" TaskParameter="GeneratedRevision" />
     </GenerateCurrentVersion>
   </Target>
 
@@ -216,11 +219,11 @@
       
     <!-- Windows Exec command requires DOS escaping for the percent sign since it secretly runs the process in a shell instead of calling createprocess. -->
     <PropertyGroup>
-      <GitCommand Condition="'$(OsEnvironment)'=='Windows_NT'">git show -s --format=^%25%25cd --date=iso HEAD</GitCommand>
-      <GitCommand Condition="'$(OsEnvironment)'!='Windows_NT'">git show -s --format=%25cd --date=iso HEAD</GitCommand>
+      <GitCommand Condition="'$(OsEnvironment)'=='Windows_NT'">git show -s --format=^%25%25cd --date=short HEAD</GitCommand>
+      <GitCommand Condition="'$(OsEnvironment)'!='Windows_NT'">git show -s --format=%25cd --date=short HEAD</GitCommand>
     </PropertyGroup>
       
-    <Exec Command="$(GitCommand)" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" ConsoleToMSBuild="true">
+    <Exec Command="$(GitCommand)" StandardOutputImportance="Low" IgnoreExitCode="true" IgnoreStandardErrorWarningFormat="true" ConsoleToMSBuild="true">
       <Output TaskParameter="ConsoleOutput" PropertyName="VersionSeedDate" />
       <Output TaskParameter="ExitCode" PropertyName="GitCommandExitCode" />
     </Exec>
@@ -232,8 +235,9 @@
 
   <!-- This target will only be executed if BuildVersion.props doesn't exist yet -->
   <Target Name="CreateVersionFileDuringBuild" Condition="'$(SkipVersionGeneration)'!='true' AND '$(ShouldCreateVersionFileDuringBuild)'=='true'" DependsOnTargets="CreateOrUpdateCurrentVersionFile">
-    <PropertyGroup>
-      <BuildNumberMajor>$(GeneratedBuildNumberMajor)</BuildNumberMajor>
+    <PropertyGroup Condition="'$(SkipVersionGeneration)'!='true'">
+      <BuildNumberMajor >$(GeneratedBuildNumberMajor)</BuildNumberMajor>
+      <BuildNumberMinor>$(GeneratedBuildNumberMinor)</BuildNumberMinor>
       <AssemblyFileVersion>$(MajorVersion).$(MinorVersion).$(BuildNumberMajor).$(BuildNumberMinor)</AssemblyFileVersion>
       <VersionSuffix Condition="'$(PreReleaseLabel)' != ''">-$(PreReleaseLabel)</VersionSuffix>
       <VersionSuffix Condition="'$(IncludeBuildNumberInPackageVersion)' == 'true'">$(VersionSuffix)-$(BuildNumberMajor).$(BuildNumberMinor)</VersionSuffix>

@@ -12,13 +12,15 @@ using Microsoft.Build.Utilities;
 
 namespace Microsoft.DotNet.Build.CloudTestTasks
 {
-    public sealed class GetPerfTestAssemblies : Task
+    public sealed class GetPerfTestAssemblies : Microsoft.Build.Utilities.Task
     {
         /// <summary>
         /// An item group of test binaries to inspect for performance tests.
         /// </summary>
         [Required]
         public ITaskItem[] TestBinaries { get; set; }
+
+        public bool GetFullPaths { get; set; }
 
         /// <summary>
         /// An item group containing performance test binaries.  Can be empty if no performance tests were found.
@@ -39,7 +41,11 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                 {
                     using (var peFile = new PEReader(stream))
                     {
+                        if(!peFile.HasMetadata){
+                            continue;
+                        }
                         var mdReader = peFile.GetMetadataReader();
+
                         foreach (var asmRefHandle in mdReader.AssemblyReferences)
                         {
                             var asmRef = mdReader.GetAssemblyReference(asmRefHandle);
@@ -50,9 +56,9 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
 
                             if (string.Compare(asmRefName, "xunit.performance.core", StringComparison.OrdinalIgnoreCase) == 0)
                             {
-                                var fileNameShort = Path.GetFileNameWithoutExtension(testBinary.ItemSpec);
-                                perfTests.Add(new TaskItem(fileNameShort));
-                                Log.LogMessage("+ Assembly {0} contains one or more performance tests.", fileNameShort);
+                                var fileName = (GetFullPaths) ? Path.GetFullPath(testBinary.ItemSpec) : Path.GetFileNameWithoutExtension(testBinary.ItemSpec);
+                                perfTests.Add(new TaskItem(fileName));
+                                Log.LogMessage("+ Assembly {0} contains one or more performance tests.", fileName);
                                 break;
                             }
                         }

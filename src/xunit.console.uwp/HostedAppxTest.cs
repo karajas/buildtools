@@ -45,6 +45,7 @@ namespace Xunit.UwpClient
                 securityRules.AddAccessRule(new FileSystemAccessRule("Users", FileSystemRights.FullControl, AccessControlType.Allow));
 
                 DirectoryInfo di = Directory.CreateDirectory(tempDir, securityRules);
+                Console.WriteLine("Creating dir:" +tempDir);
             }
             object appxFactoryRet;
             NativeMethods.CoCreateInstance(Guids.AppxFactory, null, NativeMethods.CLSCTX_INPROC_SERVER, Guids.IAppxFactory, out appxFactoryRet);
@@ -88,13 +89,13 @@ namespace Xunit.UwpClient
                 //RecurseCopy(Path.GetDirectoryName(runnerAppxPath), Path.GetFullPath(tempDir));
                 foreach (var a in project.Assemblies)
                 {
-                    Console.WriteLine("consoledebug: "+a.AssemblyFilename);
+                    Console.WriteLine("Assembly to be tested: "+a.AssemblyFilename);
                     File.Copy(a.AssemblyFilename, Path.Combine(tempDir, Path.GetFileName(a.AssemblyFilename)), true);
                 }
                 manifestPath = Path.Combine(tempDir, "AppxManifest.xml");
                 GetManifestInfoFromFile(appxFactory, manifestPath);
                 argsToPass = string.Join("\x1F", originalArgs);
-                Console.WriteLine("moreconsoledebug1: " + argsToPass);
+                Console.WriteLine("Arguments passed: " + argsToPass);
             }
             RegisterAppx(new Uri(manifestPath));
         }
@@ -150,7 +151,10 @@ namespace Xunit.UwpClient
             }
             IntPtr pid;
             var hri = activationManager.ActivateApplication(appUserModelId, this.argsToPass, ACTIVATEOPTIONS.AO_NOERRORUI | ACTIVATEOPTIONS.AO_NOSPLASHSCREEN, out pid);
+            
+            Console.WriteLine("HRI: "+hri);
             var p = Process.GetProcessById((int)pid);
+            Console.WriteLine("process: " + pid + " "+ p.ProcessName);
             p.WaitForExit((int)timeout.TotalMilliseconds);
             if (!p.HasExited)
             {
@@ -158,7 +162,8 @@ namespace Xunit.UwpClient
             }
             var resultPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "testResults.xml");
             //var logsPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "logs.txt");
-            File.Copy(resultPath, Path.Combine(InstallLocation, Path.GetFileName(resultPath)), true);
+            File.Copy(resultPath, Path.Combine(InstallLocation , Path.GetFileName(resultPath)), true);
+            Console.WriteLine("Wrote to :" + resultPath);
             //File.Copy(resultPath, Path.Combine(InstallLocation, Path.GetFileName(logsPath)), true);
         }
 

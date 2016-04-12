@@ -6,7 +6,7 @@ import shutil
 import socket
 import urllib
 import urlparse
-import sys
+import stat
 import helix.azure_storage
 import helix.depcheck
 import helix.event
@@ -36,25 +36,48 @@ def _write_output_path(file_path, settings):
             event_client = helix.event.create_from_uri(settings.event_uri)
             event_client.error(settings, "FailedUpload", "Failed to upload "+file_path+"after retry", None)
 
-def _prepare_execution_environment(settings, framework_in_tpa, assembly_list_name):
+def _get_first_dir(path, default=None):
+    iterable = os.listdir(path)
+    if iterable:
+        for item in iterable:
+            if os.path.isdir(item):
+                return item
+    return default
+
+def _prepare_execution_environment(settings, framework_in_tpa, assembly_list_name, test_dll):
     workitem_dir = fix_path(settings.workitem_working_dir)
     correlation_dir = fix_path(settings.correlation_payload_dir)
 
-
+    #location of test.dll
     test_drop = os.path.join(workitem_dir)
+
+    #location of uwp runner
+    uwp_runner_correlation_dir = os.path.join(correlation_dir, "microsoft.xunit.runner.uwp")
+    uwp_package_dir = os.path.join(uwp_runner_correlation_dir, "1.0.2-prerelease-00308-00")
+    uwp_runner_working_dir = os.path.join(test_drop, "UWPRunner")
+    ensure_directory_exists(uwp_runner_working_dir)
 
     assembly_list = os.path.join(test_drop, assembly_list_name)
 
-    uwp_correlation_dir = os.path.join(correlation_dir, "UWPAppTools")
-    uwp_runner_dir = os.path.join(correlation_dir, "UWPRunner")
-    uwp_runner_working_dir = os.path.join(test_drop, "UWPRunner")
-    ensure_directory_exists(uwp_runner_working_dir)
-    log.info("Copying uwp binaries from {} to {}".format(uwp_correlation_dir, test_drop))
-    copy_tree_to(uwp_correlation_dir, test_drop)
-    log.info("Copying uwp runner from {} to {}".format(uwp_runner_dir, uwp_runner_working_dir))
-    copy_tree_to(uwp_runner_dir, uwp_runner_working_dir)
-    log.info("Copying product binaries from {} to {}".format(correlation_dir, test_drop))
-    _copy_package_files(assembly_list, correlation_dir, test_drop)
+    uwp_app_dir = os.path.join(uwp_runner_working_dir, "app")
+    ensure_directory_exists(uwp_app_dir)
+
+    uwp_install_dir = os.path.join(test_drop, "install")
+    ensure_directory_exists(uwp_install_dir)
+
+
+    log.info("Copying uwp binaries from {} to {}".format(uwp_package_dir, uwp_runner_working_dir))
+    copy_tree_to(uwp_package_dir, uwp_runner_working_dir)
+
+    #this might be causing the bug?? just have one copy of corefx in the mix
+    log.info("Copying product binaries from {} to {}".format(correlation_dir, uwp_app_dir))
+    _copy_package_files(assembly_list, correlation_dir, uwp_app_dir)
+
+    testdll_in_app = os.path.join(uwp_app_dir, test_dll)
+    try:
+        shutil.copy2(os.path.join(test_drop, test_dll) , testdll_in_app)
+    except Exception as e:
+        print e
 
 
 def _copy_package_files(assembly_list, build_drop,  location):
@@ -99,11 +122,28 @@ def _copy_package_files(assembly_list, build_drop,  location):
         raise
 
 
+def remove_readonly(fn, path, excinfo):
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        fn(path)
+    except Exception as exc:
+        log.error("Skipped:", path, "because:\n", exc)
+
 def _run_xunit_from_execution(settings, test_dll, xunit_test_type, args):
     workitem_dir = fix_path(settings.workitem_working_dir)
 
     test_location = os.path.join(workitem_dir, 'UWPRunner')
-    results_location = os.path.join(workitem_dir, 'test_results.xml')
+    install_location = os.path.join(workitem_dir, 'install')
+
+    shutil.rmtree(install_location)
+
+    # ensure_directory_exists(install_location)
+    # shutil.copy2(os.path.join(workitem_dir, test_dll), os.path.join(install_location, test_dll))
+
+    app_location = os.path.join(test_location, 'app')
+    test_dll_location = os.path.join(app_location, test_dll)
+    correlation_dir = fix_path(settings.correlation_payload_dir)
+    results_location = os.path.join(test_location, 'testResults.xml')
 
     event_client = helix.event.create_from_uri(settings.event_uri)
 
@@ -111,7 +151,7 @@ def _run_xunit_from_execution(settings, test_dll, xunit_test_type, args):
 
     env=None
 
-    args = [os.path.join(test_location, 'xunit.console.uwp.exe'), os.path.join(workitem_dir,test_dll), '-installlocation', workitem_dir ]
+    args = [os.path.join(test_location, 'xunit.console.uwp.exe'), test_dll_location, '-installlocation', install_location ]
 
     install_result =  helix.proc.run_and_log_output(
         args,
@@ -196,7 +236,7 @@ def _report_error(settings):
 def run_tests(settings, test_dll, framework_in_tpa, assembly_list, perf_runner, xunit_test_type, args):
     try:
         log.info("Running on '{}'".format(socket.gethostname()))
-        _prepare_execution_environment(settings, framework_in_tpa, assembly_list)
+        _prepare_execution_environment(settings, framework_in_tpa, assembly_list, test_dll)
 
         return _run_xunit_from_execution(settings, test_dll, xunit_test_type, args)
     except:
