@@ -23,17 +23,13 @@ namespace XunitUwpRunner
     sealed partial class App : Application
     {
         volatile static bool cancel = false;
-
-        private string log;
+        
         private async void RunTests(string arguments)
         {
-            var reporters = await GetAvailableRunnerReporters();
+            var reporters = new List<IRunnerReporter>();
             
             string[] args = arguments.Split(new[] { '\x1F' }, StringSplitOptions.RemoveEmptyEntries);
-           //string[] args = { "Microsoft.CSharp.Tests.dll" ,"-notrait","category=nonwindowstests" ,"-notrait","Benchmark=true", "-notrait","category=OuterLoop" };
-            log = string.Empty;
             var commandLine = CommandLine.Parse(reporters, args);
-            log += "Args: " + args + "\n";
             if (commandLine.Debug)
             {
                 Debugger.Launch();
@@ -68,7 +64,6 @@ namespace XunitUwpRunner
                         var testCasesDiscovered = discoveryVisitor.TestCases.Count;
                         var filteredTestCases = discoveryVisitor.TestCases.Where(commandLine.Project.Filters.Filter).ToList();
                         var testCasesToRun = filteredTestCases.Count;
-                        log += "testCasesToRun: " + testCasesToRun + "\n";
 
                         reporterMessageHandler.OnMessage(new TestAssemblyDiscoveryFinished(assembly, discoveryOptions, testCasesDiscovered, testCasesToRun));
 
@@ -94,8 +89,7 @@ namespace XunitUwpRunner
                             }
 
                             xunit.RunTests(filteredTestCases, resultsVisitor, executionOptions);
-
-                            log += "finished running tests \n";
+                            
                             resultsVisitor.Finished.WaitOne();
 
                             reporterMessageHandler.OnMessage(new TestAssemblyExecutionFinished(assembly, executionOptions, resultsVisitor.ExecutionSummary));
@@ -107,18 +101,15 @@ namespace XunitUwpRunner
                 {
                     assembliesElement = new XElement("error");
                     assembliesElement.Add(e);
-
-                    log += "logged exec errors: " + e + "\n";
                 }
             }
             await WriteResults(assembliesElement);
-            //await WriteLogs(log);
             Application.Current.Exit();
         }
 
         static async Task WriteResults(XElement data)
         {
-            string fname = "testResults.xml";
+            string fname = "test_results.xml";
             var folder = Windows.Storage.ApplicationData.Current.LocalFolder;
             var file = await folder.CreateFileAsync(fname, Windows.Storage.CreationCollisionOption.ReplaceExisting);
             using (var stream = await file.OpenStreamForWriteAsync())
@@ -126,66 +117,6 @@ namespace XunitUwpRunner
                 data.Save(stream);
                 stream.Flush();
             }
-        }
-
-        static async Task WriteLogs(string data)
-        {
-            string fname = "logs.txt";
-            var folder = Windows.Storage.ApplicationData.Current.LocalFolder;
-            var file = await folder.CreateFileAsync(fname, Windows.Storage.CreationCollisionOption.ReplaceExisting);
-            using (var stream = await file.OpenStreamForWriteAsync())
-            {
-                using (StreamWriter sw = new StreamWriter(stream))
-                {
-                    await sw.WriteAsync(data);
-                }
-                stream.Flush();
-            }
-        }
-
-
-        static async Task<List<IRunnerReporter>> GetAvailableRunnerReporters()
-        {
-            var result = new List<IRunnerReporter>();
-            var folder = Package.Current.InstalledLocation;
-            var files = await folder.GetFilesAsync(Windows.Storage.Search.CommonFileQuery.OrderByName);
-            var candidates = files.Where(f => f.Name.EndsWith("dll") || f.Name.EndsWith("exe")).Select(f => f.Name);
-
-            //foreach (var dllFile in candidates)
-            //{
-            //    Type[] types;
-
-            //    try
-            //    {
-            //        var assembly = Assembly.Load(new AssemblyName { Name = dllFile });
-            //        types = assembly.GetTypes();
-            //    }
-            //    catch (ReflectionTypeLoadException ex)
-            //    {
-            //        types = ex.Types;
-            //    }
-            //    catch
-            //    {
-            //        continue;
-            //    }
-
-            //    foreach (var type in types)
-            //    {
-            //        if (type == null || type == typeof(DefaultRunnerReporter) || !type.GetInterfaces().Any(t => t == typeof(IRunnerReporter)))
-            //        {
-            //            continue;
-            //        }
-            //        var ctor = type.GetConstructor(new Type[0]);
-            //        if (ctor == null)
-            //        {
-            //            continue;
-            //        }
-
-            //        result.Add((IRunnerReporter)ctor.Invoke(new object[0]));
-            //    }
-            //}
-
-            return result;
         }
 
         /// <summary>

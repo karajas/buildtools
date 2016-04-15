@@ -15,7 +15,7 @@ import helix.saferequests
 import xunit
 import zip_script
 from helix.cmdline import command_main
-from helix.io import copy_tree_to, ensure_directory_exists, fix_path
+from helix.io import copy_tree_to, ensure_directory_exists, fix_path, copy_only_files
 
 log = helix.logs.get_logger()
 
@@ -60,6 +60,7 @@ def _prepare_execution_environment(settings, framework_in_tpa, assembly_list_nam
     assembly_list = os.path.join(test_drop, assembly_list_name)
 
     uwp_app_dir = os.path.join(uwp_runner_working_dir, "app")
+    uwp_dotnet_dir = os.path.join(uwp_package_dir, "lib", "dotnet")
     ensure_directory_exists(uwp_app_dir)
 
     uwp_install_dir = os.path.join(test_drop, "install")
@@ -68,16 +69,19 @@ def _prepare_execution_environment(settings, framework_in_tpa, assembly_list_nam
 
     log.info("Copying uwp binaries from {} to {}".format(uwp_package_dir, uwp_runner_working_dir))
     copy_tree_to(uwp_package_dir, uwp_runner_working_dir)
+    copy_tree_to(uwp_dotnet_dir, uwp_app_dir)
 
     #this might be causing the bug?? just have one copy of corefx in the mix
     log.info("Copying product binaries from {} to {}".format(correlation_dir, uwp_app_dir))
     _copy_package_files(assembly_list, correlation_dir, uwp_app_dir)
 
-    testdll_in_app = os.path.join(uwp_app_dir, test_dll)
-    try:
-        shutil.copy2(os.path.join(test_drop, test_dll) , testdll_in_app)
-    except Exception as e:
-        print e
+    
+    copy_only_files(uwp_dotnet_dir, uwp_app_dir)
+    # testdll_in_app = os.path.join(uwp_app_dir, test_dll)
+    # try:
+        # shutil.copy2(os.path.join(test_drop, test_dll) , testdll_in_app)
+    # except Exception as e:
+        # print e
 
 
 def _copy_package_files(assembly_list, build_drop,  location):
@@ -143,7 +147,7 @@ def _run_xunit_from_execution(settings, test_dll, xunit_test_type, args):
     app_location = os.path.join(test_location, 'app')
     test_dll_location = os.path.join(app_location, test_dll)
     correlation_dir = fix_path(settings.correlation_payload_dir)
-    results_location = os.path.join(test_location, 'testResults.xml')
+    results_location = os.path.join(install_location, 'testResults.xml')
 
     event_client = helix.event.create_from_uri(settings.event_uri)
 
@@ -151,10 +155,12 @@ def _run_xunit_from_execution(settings, test_dll, xunit_test_type, args):
 
     env=None
 
-    args = [os.path.join(test_location, 'xunit.console.uwp.exe'), test_dll_location, '-installlocation', install_location ]
+    new_args = [os.path.join(test_location, 'xunit.console.uwp.exe'), test_dll_location, '-installlocation', install_location ]
+    new_args = new_args + args
+
 
     install_result =  helix.proc.run_and_log_output(
-        args,
+        new_args,
         cwd = workitem_dir,
         env = env
     )

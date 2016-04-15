@@ -25,7 +25,6 @@ namespace Xunit.UwpClient
         {
             try
             {
-                //args = new[] { "Microsoft.CSharp.Tests.dll", "-installlocation",  @"D:\Scratch\uwprun1\3a4cde0e-a110-4a3d-99ab-b6b423abe2b0\Work\51074aa9-5506-4b00-98be-39d8675ec56c\Exec" };
                 if (args.Length == 0 || args[0] == "-?")
                 {
                     PrintHeader();

@@ -45,7 +45,7 @@ namespace Xunit.UwpClient
                 securityRules.AddAccessRule(new FileSystemAccessRule("Users", FileSystemRights.FullControl, AccessControlType.Allow));
 
                 DirectoryInfo di = Directory.CreateDirectory(tempDir, securityRules);
-                Console.WriteLine("Creating dir:" +tempDir);
+                Console.WriteLine("Creating directory:" +tempDir);
             }
             object appxFactoryRet;
             NativeMethods.CoCreateInstance(Guids.AppxFactory, null, NativeMethods.CLSCTX_INPROC_SERVER, Guids.IAppxFactory, out appxFactoryRet);
@@ -77,7 +77,6 @@ namespace Xunit.UwpClient
                     }
                 }
                 argsToPass = string.Join("\x1F", originalArgs.Where(s => !s.ToLowerInvariant().EndsWith(".appx")).Concat(payloadFiles).ToArray());
-                Console.WriteLine("moreconsoledebug1: "+ argsToPass);
                 CopyXunitDlls(this.runnerAppxPath, this.tempDir);
                 SetupManifestForXunit(manifestPath);
             }
@@ -86,7 +85,6 @@ namespace Xunit.UwpClient
                 RecurseCopy(Path.Combine(Directory.GetCurrentDirectory(), "UWPRunner", "app"), Path.GetFullPath(tempDir));
 
                 Console.WriteLine("Install Location: "+tempDir);
-                //RecurseCopy(Path.GetDirectoryName(runnerAppxPath), Path.GetFullPath(tempDir));
                 foreach (var a in project.Assemblies)
                 {
                     Console.WriteLine("Assembly to be tested: "+a.AssemblyFilename);
@@ -98,31 +96,6 @@ namespace Xunit.UwpClient
                 Console.WriteLine("Arguments passed: " + argsToPass);
             }
             RegisterAppx(new Uri(manifestPath));
-        }
-
-        public static bool IsFileReady(String sFilename)
-        {
-            // If the file can be opened for exclusive access it means that the file
-            // is no longer locked by another process.
-            try
-            {
-                using (FileStream inputStream = File.Open(sFilename, FileMode.Open, FileAccess.Read, FileShare.None))
-                {
-                    if (inputStream.Length > 0)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-
-                }
-            }
-            catch (Exception)
-            {
-                return false;
-            }
         }
 
         private static void RegisterAppx(Uri manifestUri)
@@ -151,20 +124,19 @@ namespace Xunit.UwpClient
             }
             IntPtr pid;
             var hri = activationManager.ActivateApplication(appUserModelId, this.argsToPass, ACTIVATEOPTIONS.AO_NOERRORUI | ACTIVATEOPTIONS.AO_NOSPLASHSCREEN, out pid);
-            
-            Console.WriteLine("HRI: "+hri);
+            Console.WriteLine("UWP Install HRESULT: "+hri);
             var p = Process.GetProcessById((int)pid);
-            Console.WriteLine("process: " + pid + " "+ p.ProcessName);
+            Console.WriteLine("Running {0} in process {1}", p.ProcessName, pid);
             p.WaitForExit((int)timeout.TotalMilliseconds);
             if (!p.HasExited)
             {
                 p.Kill();
             }
-            var resultPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "testResults.xml");
-            //var logsPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "logs.txt");
-            File.Copy(resultPath, Path.Combine(InstallLocation , Path.GetFileName(resultPath)), true);
-            Console.WriteLine("Wrote to :" + resultPath);
-            //File.Copy(resultPath, Path.Combine(InstallLocation, Path.GetFileName(logsPath)), true);
+            var resultPath = Path.Combine(Environment.GetEnvironmentVariable("LOCALAPPDATA"), "Packages", appUserModelId.Substring(0, appUserModelId.IndexOf('!')), "LocalState", "test_results.xml");
+            var destinationPath = Path.Combine(InstallLocation, Path.GetFileName(resultPath));
+            File.Copy(resultPath, destinationPath, true);
+            Console.WriteLine("Copy results from {0} to {1}", resultPath, destinationPath);
+            File.Delete(resultPath);
         }
 
         public void Cleanup()
@@ -190,7 +162,6 @@ namespace Xunit.UwpClient
             File.Copy(runnerAppxPath, Path.Combine(destination, Path.GetFileName(runnerAppxPath)));
             foreach (var f in Directory.GetFiles(Path.GetDirectoryName(runnerAppxPath), "xunit*"))
             {
-                Console.WriteLine("moreconsoledebug2: " + f);
                 if (!File.Exists(Path.Combine(destination, Path.GetFileName(f))))
                 {
                     File.Copy(f, Path.Combine(destination, Path.GetFileName(f)));
