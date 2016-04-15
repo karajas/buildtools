@@ -26,6 +26,8 @@
 
     <!-- By default we'll build libraries referenced by packages -->
     <BuildPackageLibraryReferences Condition="'$(BuildPackageLibraryReferences)' == ''">true</BuildPackageLibraryReferences>
+
+    <BuildInParallel Condition="'$(BuildInParallel)' == '' AND '$(MSBuildNodeCount)' > '1'">true</BuildInParallel>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(IsRuntimePackage)' == 'true' or '$(PackageTargetRuntime)' != ''">
@@ -82,6 +84,7 @@
 
   <Import Project="stable.packages.targets" />
   <Import Project="baseline.packages.targets" />
+  <Import Project="native.library.packages.targets" />
 
   <!-- If this package explicitly sets the StableVersion then add it to the stable list -->
   <ItemGroup Condition="'$(StableVersion)' != ''">
@@ -104,6 +107,8 @@
   <UsingTask TaskName="NuGetPack" AssemblyFile="$(PackagingTaskDir)Microsoft.DotNet.Build.Tasks.Packaging.dll"/>
   <UsingTask TaskName="ApplyBaseLine" AssemblyFile="$(PackagingTaskDir)Microsoft.DotNet.Build.Tasks.Packaging.dll"/>
   <UsingTask TaskName="PromoteReferenceDependencies" AssemblyFile="$(PackagingTaskDir)Microsoft.DotNet.Build.Tasks.Packaging.dll"/>
+  <UsingTask TaskName="GetMinimumNETStandard" AssemblyFile="$(PackagingTaskDir)Microsoft.DotNet.Build.Tasks.Packaging.dll"/>
+  <UsingTask TaskName="SplitDependenciesBySupport" AssemblyFile="$(PackagingTaskDir)Microsoft.DotNet.Build.Tasks.Packaging.dll"/>
 
   <!-- Determine if we actually need to build for this architecture -->
   <!-- Packages can specifically control their architecture by specifying the PackagePlatforms
@@ -182,6 +187,7 @@
           Outputs="fake"
           DependsOnTargets="SplitProjectReferences">
     <MSBuild Targets="GetPackageIdentity"
+             BuildInParallel="$(BuildInParallel)"
              Projects="@(_PkgProjProjectReferenceClosure)"
              Properties="%(_PkgProjProjectReferenceClosure.SetConfiguration); %(_PkgProjProjectReferenceClosure.SetPlatform)">
       <Output TaskParameter="TargetOutputs"
@@ -304,6 +310,7 @@
 
     <!-- Only rebuild project references when specified -->
     <MSBuild Targets="Build"
+             BuildInParallel="$(BuildInParallel)"
              Condition="'$(BuildPackageLibraryReferences)' == 'true'"
              Projects="@(_NonPkgProjProjectReference)"
              Properties="$(ProjectProperties)"
@@ -342,11 +349,22 @@
   <Target Name="GetPackageIdentity"
           Returns="@(_PackageIdentity)"
           DependsOnTargets="$(VersionDependsOn)">
+
+    <ItemGroup>
+      <_referenceFrameworks Include="%(File.TargetFramework)" Condition="'%(File.IsReferenceAsset)' == 'true'" />
+    </ItemGroup>
+
+    <GetMinimumNETStandard Condition="'$(MinimumNETStandard)' == ''"
+                           Frameworks="@(_referenceFrameworks)">
+      <Output TaskParameter="MinimumNETStandard" PropertyName="MinimumNETStandard"/>
+    </GetMinimumNETStandard>
+    
     <ItemGroup>
       <_PackageIdentity Include="$(Id)">
         <Version>$(Version)</Version>
         <TargetFramework Condition="'$(PackageTargetFramework)' != ''">$(PackageTargetFramework)</TargetFramework>
         <TargetRuntime Condition="'$(PackageTargetRuntime)' != ''">$(PackageTargetRuntime)</TargetRuntime>
+        <MinimumNETStandard Condition="'$(MinimumNETStandard)' != ''">$(MinimumNETStandard)</MinimumNETStandard>
       </_PackageIdentity>
     </ItemGroup>
   </Target>
@@ -392,6 +410,16 @@
 
   <Target Name="AssignPkgProjPackageDependenciesTargetFramework"
           DependsOnTargets="GetPkgProjPackageDependencies;GetFiles;EnsureOOBFramework">
+
+    <SplitDependenciesBySupport Condition="'$(SplitDependenciesBySupport)' == 'true'"
+                                OriginalDependencies="@(PkgProjDependency)">
+      <Output TaskParameter="SplitDependencies" ItemName="_SplitPkgProjDependency" />
+    </SplitDependenciesBySupport>
+
+    <ItemGroup Condition="'@(_SplitPkgProjDependency)' != ''">
+      <PkgProjDependency Remove="@(PkgProjDependency)" />
+      <PkgProjDependency Include="@(_SplitPkgProjDependency)" />
+    </ItemGroup>
 
     <ItemGroup>
       <!-- ensure that unconstrained dependencies are also expanded in constrained TFM groups -->
@@ -458,6 +486,8 @@
     <GetAssemblyReferences Assemblies="@(File)" Condition="'%(File.HarvestDependencies)' == 'true' and '%(File.Extension)' == '.dll'">
       <Output TaskParameter="ReferencedAssemblies"
               ItemName="_FileReferencedAssemblies"/>
+      <Output TaskParameter="ReferencedNativeLibraries"
+              ItemName="_FileReferencedNativeLibraries"/>
     </GetAssemblyReferences>
 
     <PropertyGroup>
@@ -473,10 +503,12 @@
     
     <ItemGroup Condition="'@(_FilePackageReference)' != ''">
       <_FilePackageReference Remove="corefx;mscorlib;System;System.Core;System.Xml;Windows" />
-      <_FilePackageReference Remove="@(_FilePackageReference)"
-                             Condition="$([System.String]::new('%(Identity)').StartsWith('Internal.'))"/>
-      <_FilePackageReference Remove="@(_FilePackageReference)"
-                             Condition="$([System.String]::new('%(Identity)').StartsWith('System.Private.'))"/>
+
+      <_FilePackageReferencePrivate Include="@(_FilePackageReference)"
+                                    Condition="$([System.String]::new('%(Identity)').StartsWith('System.Private.'))"/>
+
+      <!-- exclude any System.Private dependencies that aren't known packages, where known packages are in BaseLinePackage -->
+      <PackageDependencyExclude Include="@(_FilePackageReferencePrivate)" Exclude="@(BaseLinePackage)" />
       <_FilePackageReference Remove="@(PackageDependencyExclude)"/>
 
       <!-- Projects may specify additional references by assembly name & identity that we'll process
@@ -486,6 +518,17 @@
       <_FilePackageReference Condition="'%(Identity)' == '@(FileRuntimeDependency)'">
         <TargetRuntime>@(FileRuntimeDependency->'%(TargetRuntime)')</TargetRuntime>
       </_FilePackageReference>
+    </ItemGroup>
+
+    <ItemGroup Condition="'@(_FileReferencedNativeLibraries)' != ''">
+      <!-- intersect with NativeLibrary and add Package metadata from NativeLibrary, preserving native lib file name in metadata -->
+      <_FileReferencedNativeLibrariesWithPackage Include="@(_FileReferencedNativeLibraries)"
+                                                 Condition="'@(_FileReferencedNativeLibraries)' == '@(NativeLibrary)' AND '%(Identity)' != ''">
+        <Package>@(NativeLibrary->'%(Package)')</Package>
+        <NativeLibrary>%(Identity)</NativeLibrary>
+      </_FileReferencedNativeLibrariesWithPackage>
+
+      <_FilePackageReference Include="@(_FileReferencedNativeLibrariesWithPackage->'%(Package)')" />
     </ItemGroup>
     
     <ItemGroup>
@@ -718,7 +761,11 @@
     </ItemGroup>
 
     <!-- Lineups need to have all runtime dependencies to ensure that they are part of the compile graph -->
-    <MSBuild Projects="@(LineupProjectReference)" Targets="DetermineRuntimeDependencies" Condition="'$(IsLineupPackage)' == 'true'" Properties="$(ProjectProperties)">
+    <MSBuild Projects="@(LineupProjectReference)" 
+             Targets="DetermineRuntimeDependencies" 
+             Condition="'$(IsLineupPackage)' == 'true'"
+             BuildInParallel="$(BuildInParallel)"
+             Properties="$(ProjectProperties)">
       <Output TaskParameter="TargetOutputs" ItemName="_indirectRuntimeDependencies" />
     </MSBuild>
 
@@ -859,7 +906,10 @@
     </ItemGroup>
 
     <!-- Get all the files from runtime implementation packages to include in reference path-->
-    <MSBuild Projects="@(RuntimeProjectReference)" Targets="GetPackageFiles" Properties="$(ProjectProperties)">
+    <MSBuild Projects="@(RuntimeProjectReference)" 
+             Targets="GetPackageFiles" 
+             BuildInParallel="$(BuildInParallel)"
+             Properties="$(ProjectProperties)">
       <Output TaskParameter="TargetOutputs" ItemName="RuntimeFile" />
     </MSBuild>
 
@@ -934,6 +984,8 @@
                ExcludeEmptyDirectories="true"
                PackSymbolPackage="true"
                SymbolPackageOutputDirectory="$(SymbolPackageOutputPath)"
+               AdditionalLibPackageExcludes="@(AdditionalLibPackageExcludes)"
+               AdditionalSymbolPackageExcludes="@(AdditionalSymbolPackageExcludes)"
                Condition="'$(_SkipCreatePackage)' != 'true'"/>
     <!-- Create a marker that records the path to the generated package -->
     <WriteLinesToFile Lines="$(PackageOutputPath)$(Id).$(Version).nupkg;$(SymbolPackageOutputPath)$(Id).$(Version).symbols.nupkg"

@@ -131,6 +131,20 @@
       Condition="'$(NativeVersionHeaderFile)'!='' and '$(GenerateVersionHeader)'=='true'">
 
     <ItemGroup>
+      <!-- Some of these variables might be defined by macros, so undefine them first to avoid build warnings. -->
+      <NativeVersionLines Include="#undef VER_COMPANYNAME_STR" />
+      <NativeVersionLines Include="#undef VER_FILEDESCRIPTION_STR" />
+      <NativeVersionLines Include="#undef VER_INTERNALNAME_STR" />
+      <NativeVersionLines Include="#undef VER_ORIGINALFILENAME_STR" />
+      <NativeVersionLines Include="#undef VER_PRODUCTNAME_STR" />
+      <NativeVersionLines Include="#undef VER_PRODUCTVERSION" />
+      <NativeVersionLines Include="#undef VER_PRODUCTVERSION_STR" />
+      <NativeVersionLines Include="#undef VER_FILEVERSION" />
+      <NativeVersionLines Include="#undef VER_FILEVERSION_STR" />
+      <NativeVersionLines Include="#undef VER_LEGALCOPYRIGHT_STR" />
+      <NativeVersionLines Include="#undef VER_DEBUG" />
+
+      <!-- Defining versioning variables -->
       <NativeVersionLines Include="#define VER_COMPANYNAME_STR         &quot;Microsoft Corporation&quot;" />
       <NativeVersionLines Include="#define VER_FILEDESCRIPTION_STR     &quot;$(AssemblyName)&quot;" />
       <NativeVersionLines Include="#define VER_INTERNALNAME_STR        VER_FILEDESCRIPTION_STR" />
@@ -152,6 +166,30 @@
 
     <ItemGroup>
       <FileWrites Include="$(NativeVersionHeaderFile)" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Non Windows versioning requires to generate a source file and include it on the compilation. -->
+  <Target Name="GenerateVersionSourceFile"
+      Inputs="$(MSBuildProjectFile)"
+      Outputs="$(NativeVersionSourceFile)"
+      DependsOnTargets="CreateVersionFileDuringBuild"
+      Condition="'$(NativeVersionSourceFile)'!='' and '$(GenerateVersionSourceFile)'=='true'">
+
+    <ItemGroup>
+      <SourceFileLines />
+      <SourceFileLines Include="static char sccsid%5B%5D %5F%5Fattribute%5F%5F%28%28used%29%29 %3D %22%40%28%23%29Version $(MajorVersion).$(MinorVersion).$(BuildNumberMajor).$(BuildNumberMinor)%22%3B" />
+      <!-- Since this is a source file, compiler will complain if there is no new line at end of file, so adding one bellow. -->
+      <SourceFileLines Include=" " />
+    </ItemGroup>
+
+    <WriteLinesToFile
+      File="$(NativeVersionSourceFile)"
+      Lines="@(SourceFileLines)"
+      Overwrite="true" />
+
+    <ItemGroup>
+      <FileWrites Include="$(NativeVersionSourceFile)" />
     </ItemGroup>
   </Target>
 
@@ -240,7 +278,7 @@
       <BuildNumberMinor>$(GeneratedBuildNumberMinor)</BuildNumberMinor>
       <AssemblyFileVersion>$(MajorVersion).$(MinorVersion).$(BuildNumberMajor).$(BuildNumberMinor)</AssemblyFileVersion>
       <VersionSuffix Condition="'$(PreReleaseLabel)' != ''">-$(PreReleaseLabel)</VersionSuffix>
-      <VersionSuffix Condition="'$(IncludeBuildNumberInPackageVersion)' == 'true'">$(VersionSuffix)-$(BuildNumberMajor).$(BuildNumberMinor)</VersionSuffix>
+      <VersionSuffix Condition="'$(IncludeBuildNumberInPackageVersion)' == 'true'">$(VersionSuffix)-$(BuildNumberMajor)-$(BuildNumberMinor)</VersionSuffix>
     </PropertyGroup>
   </Target>
 

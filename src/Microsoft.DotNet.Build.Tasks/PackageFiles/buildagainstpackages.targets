@@ -3,10 +3,17 @@
   <UsingTask TaskName="AddDependenciesToProjectJson" AssemblyFile="$(BuildToolsTaskDir)Microsoft.DotNet.Build.Tasks.dll"/>
   <UsingTask TaskName="ParsePackageNames" AssemblyFile="$(BuildToolsTaskDir)Microsoft.DotNet.Build.Tasks.dll"/>
   <UsingTask TaskName="GetPackageNumberFromPackageDrop" AssemblyFile="$(BuildToolsTaskDir)Microsoft.DotNet.Build.Tasks.dll"/>
+  <UsingTask TaskName="DumpItem" AssemblyFile="$(BuildToolsTaskDir)Microsoft.DotNet.Build.Tasks.dll"/>
+  
 
   <ItemGroup>
     <_PackagesDrops Include="$(PackagesDrops)" />
   </ItemGroup>
+  <PropertyGroup>
+    <PackageNameRegex Condition="'$(PackageNameRegex)' == ''">(.*)\.(\d+\.\d+\.\d+)-([^-]+-\d+-\d+)</PackageNameRegex>
+    <VersionStructureRegex Condition="'$(VersionStructureRegex)' == ''">(\d+\.\d+\.\d+)-((beta|rc2|rc3)-?(\d+(-\d+)?)?)</VersionStructureRegex>
+    <BuildNumberOverrideStructureRegex Condition="'$(BuildNumberOverrideStructureRegex)' == ''">([^-]+)?-?(\d+(-\d+)?)?</BuildNumberOverrideStructureRegex>
+  </PropertyGroup>
   <PropertyGroup>
     <!-- overridden in repo -->
     <GeneratedProjectJsonDir Condition="'$(GeneratedProjectJsonDir)' == ''">$(ObjDir)generated</GeneratedProjectJsonDir>
@@ -19,26 +26,37 @@
       BeforeResolveReferences;
       $(CleanDependsOn)
     </CleanDependsOn>
+    <BuildDependsOn>
+      GenerateTestProjectJson;
+      $(BuildDependsOn);
+    </BuildDependsOn>
     <ResolveAssemblyReferencesDependsOn>
       $(ResolveAssemblyReferencesDependsOn);
       DetermineProjectJsonPath;
       ResolveNuGetPackages;
     </ResolveAssemblyReferencesDependsOn>
+    <ResolveNuGetPackagesDependsOn>
+      $(ResolveNuGetPackagesDependsOn);
+      DetermineProjectJsonPath;
+    </ResolveNuGetPackagesDependsOn>
   </PropertyGroup>
 
   <Target Name="GenerateTestProjectJson" DependsOnTargets="ExtractProjectReferences;GatherAssemblyVersionsFromPackagesDrops;GatherProjectReferenceForProjectJson;DetermineProjectJsonPath;AddDependenciesToProjectJson" />
-
-  <!-- Override targets for building against packages -->
-  <Target Name="BuildAndTest" DependsOnTargets="GenerateTestProjectJson;Build;Test" />
-  <Target Name="RebuildAndTest" DependsOnTargets="GenerateTestProjectJson;Rebuild;Test" />
+  
+  <Target Name="GenerateAllTestProjectJsons" DependsOnTargets="GenerateTestProjectJson" />
 
   <Target Name="DetermineProjectJsonPath">
     <PropertyGroup>
       <OriginalProjectJson>$(ProjectJson)</OriginalProjectJson>
+      <GeneratedTargetGroup Condition="'$(GeneratedTargetGroup)' == ''">$(TargetGroup)</GeneratedTargetGroup>
+      <GeneratedOSGroup Condition="'$(GeneratedOSGroup)' == ''">$(OSGroup)</GeneratedOSGroup>
       <!-- We can't put the generated project.json in the output path or NuGet will interpret Microsoft.Win32.Primitives as a "project"
            type instead of a "package" type when generating the project.lock.json file, so we have to place our project.json in a different path location. -->
-      <ProjectJson>$(GeneratedProjectJsonDir)\$(MSBuildProjectName)\json\project.json</ProjectJson>
-      <GeneratedProjectLockJson>$(GeneratedProjectJsonDir)\$(MSBuildProjectName)\json\project.lock.json</GeneratedProjectLockJson>
+      <ProjectsGeneratedProjectJsonDir>$(GeneratedProjectJsonDir)\$(MSBuildProjectName)\</ProjectsGeneratedProjectJsonDir>
+      <ProjectsGeneratedProjectJsonDir Condition="'$(GeneratedOSGroup)' != ''">$(ProjectsGeneratedProjectJsonDir)$(GeneratedOSGroup)\</ProjectsGeneratedProjectJsonDir>
+      <ProjectsGeneratedProjectJsonDir Condition="'$(GeneratedTargetGroup)' != ''">$(ProjectsGeneratedProjectJsonDir)$(GeneratedTargetGroup)\</ProjectsGeneratedProjectJsonDir>
+      <ProjectJson>$(ProjectsGeneratedProjectJsonDir)project.json</ProjectJson>
+      <GeneratedProjectLockJson>$(ProjectsGeneratedProjectJsonDir)project.lock.json</GeneratedProjectLockJson>
       <!-- Not all projects generate a new project.json, so only update the project.lock.json if it has been restored. -->
       <ProjectLockJson Condition="Exists('$(GeneratedProjectLockJson)')">$(GeneratedProjectLockJson)</ProjectLockJson>
     </PropertyGroup>
@@ -77,7 +95,7 @@
       </_PackageDropAssembly>
     </ItemGroup>
     <ParsePackageNames PackageDrops="@(_PackagesDrops)"
-                                           PackageNameRegex="([^\\]+)\.(\d+\.\d+\.\d+)-([^\.]+)">
+                       PackageNameRegex="$(PackageNameRegex)">
        <Output TaskParameter="PackageNames" ItemName="_PackageVersionList" />                                                  
     </ParsePackageNames>                                           
   </Target>
@@ -93,7 +111,7 @@
       <!-- determine the version of the assembly in the project reference by looking at the packages in "PackagesDrops".  -->
       <!-- If an alternate packagereferencename was specified, then look for that version number instead of the version number for the project reference. -->
       <_AssemblyVersion Condition="'$(_PackageReferenceName)' != '' and '%(_PackageVersionList.PackageName)' == '$(_PackageReferenceName)'">%(_PackageVersionList.PackageVersion)</_AssemblyVersion>
-      <_AssemblyVersion Condition="'$(_AssemblyVersion)' == '' and '%(_PackageVersionList.AssemblyName)' == '$(_InjectProjectReference)'">%(_PackageVersionList.PackageVersion)</_AssemblyVersion>
+      <_AssemblyVersion Condition="'$(_AssemblyVersion)' == '' and '%(_PackageVersionList.PackageName)' == '$(_InjectProjectReference)'">%(_PackageVersionList.PackageVersion)</_AssemblyVersion>
     </PropertyGroup>
 
     <Message Condition="'$(_AssemblyVersion)' != ''" Text="Derived version number from packages drop." />   
@@ -142,26 +160,29 @@
     <Error Condition="'$(ErrorNoVersion)' == 'true'" Text="Unable to determine version number for project reference dependency '%(_InjectProjectReferenceDependency.Name)'" />
   </Target>
   
+  
   <Target Name="AddDependenciesToProjectJson"
           DependsOnTargets="GatherProjectReferenceForProjectJson;DetermineProjectJsonPath"
           Condition="'@(_InjectProjectReferenceDependency)' != ''">
     
     <Message Condition="'$(PackageBuildNumberOverride)' != ''" Text="Setting package version to '$(PackageBuildNumberOverride)'" />
-    <GetPackageNumberFromPackageDrop Condition="'@(_PackagesDrops)' != ''"
-                                     PackageDrops="@(_PackagesDrops)">
-      <Output TaskParameter="PackageNumber" PropertyName="_DerivedPackageNumber" />
-    </GetPackageNumberFromPackageDrop>
-    
+    <ParsePackageNames Condition="'@(_PackagesDrops)' != '' and '$(_DerivedPackageNumber)' == ''"
+                       PackageDrops="@(_PackagesDrops)"
+                       PackageNameRegex="$(PackageNameRegex)">
+      <Output TaskParameter="PackageNames" ItemName="_ParsedPackages" />
+    </ParsePackageNames>
+    <PropertyGroup>
+      <_DerivedPackageNumber Condition="'$(_DerivedPackageNumber)' == '' and '%(_ParsedPackages.PrereleaseVersion)' != ''">%(_ParsedPackages.PrereleaseVersion)</_DerivedPackageNumber>
+    </PropertyGroup>
     <Message Condition="'$(PackageBuildNumberOverride)' == '' and '$(_DerivedPackageNumber)' != ''" Text="Derived package version from packagedrops.  Setting package version to '$(_DerivedPackageNumber)'" />
     <PropertyGroup>
         <PackageBuildNumberOverride Condition="'$(PackageBuildNumberOverride)' == '' and '$(_DerivedPackageNumber)' != ''">$(_DerivedPackageNumber)</PackageBuildNumberOverride>
-        <VersionStructureRegex Condition="'$(VersionStructureRegex)' == ''">(\d+\.\d+\.\d+)-((beta|rc2|rc3)-?(\d+)?)</VersionStructureRegex>
-        <BuildNumberOverrideStructureRegex Condition="'$(BuildNumberOverrideStructureRegex)' == ''">([^-]+)?-?(\d+(-\d+)?)?</BuildNumberOverrideStructureRegex>
     </PropertyGroup>
     <AddDependenciesToProjectJson Condition="'$(ErrorNoVersion)' == ''"
                                   VersionStructureRegex="$(VersionStructureRegex)"
                                   AdditionalDependencies="@(_InjectProjectReferenceDependency)"
                                   ProjectJson="$(OriginalProjectJson)"
+                                  Frameworks="$(GeneratedTargetGroup)"
                                   OutputProjectJson="$(ProjectJson)" 
                                   PackageBuildNumberOverride="$(PackageBuildNumberOverride)"
                                   BuildNumberOverrideStructureRegex="$(BuildNumberOverrideStructureRegex)" />
