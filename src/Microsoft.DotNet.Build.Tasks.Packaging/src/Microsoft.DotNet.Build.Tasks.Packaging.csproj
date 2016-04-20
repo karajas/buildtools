@@ -50,19 +50,14 @@
     <Compile Include="VersionUtility.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="PackageFiles\native.library.packages.targets">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="PackageFiles\Generations.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="PackageFiles\Packaging.targets">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <SubType>Designer</SubType>
     </None>
     <None Include="PackageFiles\PackageLibs.targets">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="PackageFiles\baseline.packages.targets">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="PackageFiles\_._">
@@ -73,10 +68,8 @@
       <Link>FrameworkLists\%(RecursiveDir)%(FileName)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="PackageFiles\stable.packages.targets">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Include="$(PackagesDir)Microsoft.NETCore.Platforms\1.0.1-rc2-23923\runtime.json">
+    <None Include="$(PackagesDir)Microsoft.NETCore.Platforms\1.0.1-$(CoreFxExpectedPrerelease)\runtime.json">
+      <Link>PackageFiles\runtime.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
@@ -88,6 +81,17 @@
     <Folder Include="FrameworkLists\.NETFramework,Version=v4.6.1\" />
     <Folder Include="FrameworkLists\.NETFramework,Version=v4.6.2\" />
     <Folder Include="FrameworkLists\.NETFramework,Version=v4.6\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.5,Profile=Profile111\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.5,Profile=Profile259\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.5,Profile=Profile49\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.5,Profile=Profile78\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.5,Profile=Profile7\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.6,Profile=Profile151\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.6,Profile=Profile157\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.6,Profile=Profile31\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.6,Profile=Profile32\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.6,Profile=Profile44\" />
+    <Folder Include="FrameworkLists\.NETPortable,Version=v4.6,Profile=Profile84\" />
     <Folder Include="FrameworkLists\MonoAndroid,Version=v1.0\" />
     <Folder Include="FrameworkLists\MonoTouch,Version=v1.0\" />
     <Folder Include="FrameworkLists\WindowsPhone,Version=v8.0\" />
