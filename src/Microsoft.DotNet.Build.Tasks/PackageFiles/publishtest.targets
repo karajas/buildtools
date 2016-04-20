@@ -15,6 +15,7 @@
   <PropertyGroup>
     <PrepareForRunDependsOn Condition="'$(IsTestProject)'=='true'">$(PrepareForRunDependsOn);CopyTestToTestDirectory;CreateTestNuGetPackage;CreateAssemblyListTxt</PrepareForRunDependsOn>
     <TestArchitecture Condition="'$(TestArchitecture)' == ''">x64</TestArchitecture>
+    <TestNugetRuntimeId Condition="'$(TestAppX)'=='true'">win10-$(Platform)</TestNugetRuntimeId>
     <TestNugetRuntimeId Condition="'$(TestNugetRuntimeId)' == ''">win7-$(TestArchitecture)</TestNugetRuntimeId>
   </PropertyGroup>
 

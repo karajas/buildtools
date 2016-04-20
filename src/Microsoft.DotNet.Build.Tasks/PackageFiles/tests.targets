@@ -45,10 +45,16 @@
     <DebugTestFrameworkFolder>dnx45</DebugTestFrameworkFolder>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(TestWithCore)' == 'true'">
+  <ItemGroup Condition="'$(TestWithCore)' == 'true' AND '$(TestAppX)'!='true'">
     <TestTargetFramework Include="DNXCore,Version=v5.0">
       <Folder>dnxcore50</Folder>
     </TestTargetFramework>
+  </ItemGroup>
+  
+  <ItemGroup Condition="'$(TestWithCore)' == 'true' AND '$(TestAppX)'=='true'">
+      <TestTargetFramework Include=".NETCore,Version=v5.0">
+        <Folder>netcore50</Folder>
+      </TestTargetFramework>
   </ItemGroup>
 
   <ItemGroup Condition="'$(TestWithCore)' != 'true'">

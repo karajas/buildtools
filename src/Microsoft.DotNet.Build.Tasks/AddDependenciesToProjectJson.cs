@@ -41,6 +41,15 @@ namespace Microsoft.DotNet.Build.Tasks
         [Required]
         public string OutputProjectJson { get; set; }
 
+
+        public bool OverwriteFrameworkSection { get; set; }
+
+        public ITaskItem[] OverwrittenFrameworks { get; set; }
+
+        public bool OverwriteRuntimesSection { get; set; }
+
+        public ITaskItem[] OverwrittenRuntimes { get; set; }
+
         private Regex _versionStructureRegex;
         private Regex _buildNumberOverrideStructureRegex;
 
@@ -82,6 +91,7 @@ namespace Microsoft.DotNet.Build.Tasks
             if (Frameworks == null || Frameworks.Length == 0)
             {
                 Frameworks = projectRoot.SelectTokens("frameworks").SelectMany(f => f.Children().Select(c => ((JProperty)c).Name)).ToArray();
+                Log.LogMessage("frameowrks to log: {0}", Frameworks);
             }
 
             // Update default dependencies section
@@ -94,6 +104,17 @@ namespace Microsoft.DotNet.Build.Tasks
                 dependencies = GenerateDependencies(projectRoot, Frameworks[i]);
                 projectRoot = UpdateDependenciesProperty(projectRoot, dependencies, Frameworks[i]);
             }
+            
+            if (OverwriteFrameworkSection)
+            {
+                projectRoot = OverwriteFrameworks(projectRoot);
+            }
+
+            if (OverwriteRuntimesSection)
+            {
+                projectRoot = OverwriteRuntimes(projectRoot);
+            }
+
             WriteProject(projectRoot, OutputProjectJson);
 
             return true;
@@ -136,6 +157,57 @@ namespace Microsoft.DotNet.Build.Tasks
                 return projectJsonRoot["dependencies"];
             }
             return projectJsonRoot.SelectToken("frameworks." + framework + ".dependencies");
+        }
+
+        private JObject OverwriteFrameworks(JObject projectJsonRoot)
+        {
+            JProperty id = projectJsonRoot.Children<JProperty>().FirstOrDefault(p => p.Name == "frameworks");
+            id?.Remove();
+
+            if (this.OverwrittenFrameworks.Length == 0)
+            {
+                this.Log.LogError("No new framework to overwrite specified");
+            }
+
+            foreach (ITaskItem item in this.OverwrittenFrameworks)
+            {
+                JObject newFrameworks = new JObject();
+                newFrameworks["imports"] = item.GetMetadata("Imports");
+                newFrameworks["dependencies"] = new JObject();
+
+                string testRuntime = item.GetMetadata("TestRuntime");
+                if (!string.IsNullOrEmpty(testRuntime))
+                {
+                    JObject currentValue = null;
+                    JToken value = JObject.Parse(" { 'target': 'project','exclude': 'compile' }");
+
+                    JProperty testRuntimeRoot =
+                        newFrameworks.Children<JProperty>().FirstOrDefault(p => p.Name == "dependencies");
+                    JToken jt = testRuntimeRoot.Value;
+                    currentValue = jt as JObject;
+                    currentValue.Add(testRuntime, value);
+                }
+                JObject netcoreObj = new JObject();
+                netcoreObj.Add(item.ItemSpec, newFrameworks);
+                projectJsonRoot.Add("frameworks", netcoreObj);
+            }
+            return projectJsonRoot;
+        }
+
+        private JObject OverwriteRuntimes(JObject projectJsonRoot)
+        {
+            JProperty id = projectJsonRoot.Children<JProperty>().FirstOrDefault(p => p.Name == "runtimes");
+            id?.Remove();
+
+            JObject newRuntimes = new JObject();
+            foreach (ITaskItem item in OverwrittenRuntimes)
+            {
+                string testRuntime = item.ItemSpec;
+                newRuntimes.Add(testRuntime, new JObject());
+            }
+
+            projectJsonRoot.Add("runtimes", newRuntimes);
+            return projectJsonRoot;
         }
 
         // Generate the combines dependencies from the projectjson jObject and from AdditionalDependencies
