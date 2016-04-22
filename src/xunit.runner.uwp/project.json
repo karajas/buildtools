@@ -1,6 +1,6 @@
 ﻿{
   "dependencies": {
-    "Microsoft.NETCore.UniversalWindowsPlatform": "5.2.0-rc3-24018-00",
+    "Microsoft.NETCore.UniversalWindowsPlatform": "5.2.0-rc3-24022-00",
     "xunit": "2.1.0",
     "xunit.runner.utility": "2.1.0"
   },

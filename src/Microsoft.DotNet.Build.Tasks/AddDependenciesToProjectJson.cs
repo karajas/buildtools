@@ -91,7 +91,7 @@ namespace Microsoft.DotNet.Build.Tasks
             if (Frameworks == null || Frameworks.Length == 0)
             {
                 Frameworks = projectRoot.SelectTokens("frameworks").SelectMany(f => f.Children().Select(c => ((JProperty)c).Name)).ToArray();
-                Log.LogMessage("frameowrks to log: {0}", Frameworks);
+                Log.LogMessage("frameworks to log: {0}", Frameworks);
             }
 
             // Update default dependencies section
@@ -104,9 +104,10 @@ namespace Microsoft.DotNet.Build.Tasks
                 dependencies = GenerateDependencies(projectRoot, Frameworks[i]);
                 projectRoot = UpdateDependenciesProperty(projectRoot, dependencies, Frameworks[i]);
             }
-            
             if (OverwriteFrameworkSection)
             {
+                //Remove test-runtime dependency
+                projectRoot = RemoveTestRuntimeFromDependencyList(projectRoot);
                 projectRoot = OverwriteFrameworks(projectRoot);
             }
 
@@ -118,6 +119,13 @@ namespace Microsoft.DotNet.Build.Tasks
             WriteProject(projectRoot, OutputProjectJson);
 
             return true;
+        }
+
+        private JObject RemoveTestRuntimeFromDependencyList(JObject projectJsonRoot)
+        {
+            JProperty id = projectJsonRoot.Children<JProperty>().FirstOrDefault(p => p.Name == "dependencies").Value.Children<JProperty>().FirstOrDefault(p => p.Name == "test-runtime");
+            id?.Remove();
+            return projectJsonRoot;
         }
 
         private string AreValidFrameworkPaths(JObject projectRoot)

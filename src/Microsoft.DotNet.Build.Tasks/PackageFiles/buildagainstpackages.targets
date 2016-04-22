@@ -169,7 +169,7 @@
           
     <ItemGroup Condition="'$(TestAppX)'=='true'">
         <ReplacementFramework Include="netcore50">
-            <Imports></Imports>
+            <Imports>uap10.0</Imports>
             <Dependencies></Dependencies>
             <TestRuntime>netcore50-test-runtime</TestRuntime>
         </ReplacementFramework>

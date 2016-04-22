@@ -51,7 +51,7 @@ def _prepare_execution_environment(settings, assembly_list_name, test_dll):
     assembly_list = os.path.join(test_drop, assembly_list_name)
 
     uwp_app_dir = os.path.join(uwp_runner_working_dir, "app")
-    uwp_dotnet_dir = os.path.join(uwp_package_dir, "lib", "dotnet")
+    uwp_dotnet_dir = os.path.join(uwp_package_dir, "lib", "uap10.0")
     ensure_directory_exists(uwp_app_dir)
 
     log.info("Copying uwp binaries from {} to {}".format(uwp_package_dir, uwp_runner_working_dir))

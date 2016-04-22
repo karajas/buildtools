@@ -25,12 +25,12 @@
   </metadata>
   <files>
     <!-- xunit runner for UWP -->
-    <file src="xunit.runner.uwp\**\*.exe" target="lib\netcore50" />
-    <file src="xunit.runner.uwp\**\*.xml" target="lib\netcore50" />
-    <file src="xunit.runner.uwp\**\*.xbf" target="lib\netcore50" />
-    <file src="xunit.runner.uwp\**\*.pri" target="lib\netcore50" />
-    <file src="xunit.runner.uwp\**\*.pdb" target="lib\netcore50" />
-    <file src="xunit.runner.uwp\**\*.appxrecipe" target="lib\netcore50" />
+    <file src="xunit.runner.uwp\**\*.exe" target="lib\uap10.0" />
+    <file src="xunit.runner.uwp\**\*.xml" target="lib\uap10.0" />
+    <file src="xunit.runner.uwp\**\*.xbf" target="lib\uap10.0" />
+    <file src="xunit.runner.uwp\**\*.pri" target="lib\uap10.0" />
+    <file src="xunit.runner.uwp\**\*.pdb" target="lib\uap10.0" />
+    <file src="xunit.runner.uwp\**\*.appxrecipe" target="lib\uap10.0" />
     <file src="xunit.console.uwp\**\*.*" target="" />
   </files>
   
