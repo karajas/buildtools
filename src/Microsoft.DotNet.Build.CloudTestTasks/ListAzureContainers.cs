@@ -55,37 +55,62 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
             
             Log.LogMessage(MessageImportance.Normal, "Sending request to list containers in account '{0}'.", AccountName);
 
-            using (HttpClient client = new HttpClient())
+            int retryCount = 15;
+            bool isOperationSuccess = false;
+            while (!isOperationSuccess)
             {
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, url))
+                using (HttpClient client = new HttpClient())
                 {
-                    try
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, url))
                     {
-                        request.Headers.Add(AzureHelper.DateHeaderString, dateTime.ToString("R", CultureInfo.InvariantCulture));
-                        request.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-                        request.Headers.Add(AzureHelper.AuthorizationHeaderString, AzureHelper.AuthorizationHeader(
-                                AccountName,
-                                AccountKey,
-                                "GET",
-                                dateTime,
-                                request));
-
-                        XmlDocument responseFile;
-                        using (HttpResponseMessage response = await client.SendAsync(request))
+                        try
                         {
-                            responseFile = new XmlDocument();
-                            responseFile.LoadXml(await response.Content.ReadAsStringAsync());
-                            XmlNodeList elemList = responseFile.GetElementsByTagName("Name");
+                            request.Headers.Add(
+                                AzureHelper.DateHeaderString,
+                                dateTime.ToString("R", CultureInfo.InvariantCulture));
+                            request.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                            request.Headers.Add(
+                                AzureHelper.AuthorizationHeaderString,
+                                AzureHelper.AuthorizationHeader(AccountName, AccountKey, "GET", dateTime, request));
 
-                            ContainerNames = (from x in elemList.Cast<XmlNode>()
-                                              where x.InnerText.Contains(Prefix)
-                                              select new TaskItem(x.InnerText)).ToArray();
+                            using (HttpResponseMessage response = await client.SendAsync(request))
+                            {
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    XmlDocument responseFile = new XmlDocument();
+                                    responseFile.LoadXml(await response.Content.ReadAsStringAsync());
+                                    XmlNodeList elemList = responseFile.GetElementsByTagName("Name");
+
+                                    ContainerNames =
+                                        (from x in elemList.Cast<XmlNode>()
+                                         where x.InnerText.Contains(Prefix)
+                                         select new TaskItem(x.InnerText)).ToArray();
+
+                                    isOperationSuccess = true;
+                                }
+                                else
+                                {
+                                    if (retryCount-- <= 0)
+                                    {
+                                        throw new AzureException(
+                                        string.Format(
+                                            "Failed to list Containers : Status Code: {0} {1}",
+                                            response.StatusCode,
+                                            response.Content));
+                                    }
+
+                                    Log.LogWarning(
+                                        "Failed to get response from '{0}', {1} retries remaining",
+                                        url,
+                                        retryCount);
+                                }
+                            }
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        Log.LogError("Failed to retrieve information.\n" + e.Message);
-                        return false;
+                        catch (Exception e)
+                        {
+                            Log.LogError("Failed to retrieve information.\n" + e.Message);
+                            return false;
+                        }
                     }
                 }
             }

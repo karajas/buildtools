@@ -66,42 +66,67 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
             {
                 using (StreamReader streamReader = new StreamReader(fs))
                 {
-                    using (HttpClient client = new HttpClient())
+                    int retryCount = 15;
+                    bool isOperationSuccess = false;
+                    while (!isOperationSuccess)
                     {
-                        string url = String.IsNullOrEmpty(PartitionKey) ? EventHubPath + "/messages" : EventHubPath + "/partitions/" + PartitionKey +"/messages";
-                        using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, url))
+                        using (HttpClient client = new HttpClient())
                         {
-                            req.Headers.Add(AzureHelper.AuthorizationHeaderString, ConstructSharedAccessToken());
-                            
-                            contentBytes = Encoding.UTF8.GetBytes(streamReader.ReadToEnd());
-                            using (Stream postStream = new MemoryStream())
+                            string url = String.IsNullOrEmpty(PartitionKey)
+                                             ? EventHubPath + "/messages"
+                                             : EventHubPath + "/partitions/" + PartitionKey + "/messages";
+                            using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Post, url))
                             {
-                                postStream.Write(this.contentBytes, 0, this.contentBytes.Length);
-                                postStream.Seek(0, SeekOrigin.Begin);
-                                StreamContent contentStream = new StreamContent(postStream);
-                                req.Content = contentStream;
+                                req.Headers.Add(AzureHelper.AuthorizationHeaderString, ConstructSharedAccessToken());
 
-                                Log.LogMessage(MessageImportance.High, "Sending {0} to event hub {1}", EventData, url);
-
-                                using (HttpResponseMessage response = await client.SendAsync(req))
+                                contentBytes = Encoding.UTF8.GetBytes(streamReader.ReadToEnd());
+                                using (Stream postStream = new MemoryStream())
                                 {
-                                    this.Log.LogMessage(MessageImportance.Normal, "Received response to send event to event hub");
+                                    postStream.Write(this.contentBytes, 0, this.contentBytes.Length);
+                                    postStream.Seek(0, SeekOrigin.Begin);
+                                    StreamContent contentStream = new StreamContent(postStream);
+                                    req.Content = contentStream;
 
-                                    if (response.StatusCode != HttpStatusCode.Created)
+                                    Log.LogMessage(
+                                        MessageImportance.High,
+                                        "Sending {0} to event hub {1}",
+                                        EventData,
+                                        url);
+
+                                    using (HttpResponseMessage response = await client.SendAsync(req))
                                     {
-                                        this.Log.LogError(
-                                            "Failed to send event to event hub: StatusCode:{0} Response:{1}",
-                                            response.StatusCode,
-                                            await response.Content.ReadAsStringAsync());
-                                        return false;
+                                        this.Log.LogMessage(
+                                            MessageImportance.Normal,
+                                            "Received response to send event to event hub");
+
+                                        if (response.IsSuccessStatusCode)
+                                        {
+                                            Log.LogMessage(
+                                                MessageImportance.Normal,
+                                                "Successfully sent notification to event hub path {0}.",
+                                                EventHubPath);
+                                            isOperationSuccess = true;
+                                        }
+                                        else
+                                        {
+                                            if (retryCount-- <= 0)
+                                            {
+                                                throw new AzureException(
+                                                string.Format(
+                                                    "Failed to send event to event hub: StatusCode:{0} Response:{1}",
+                                                    response.StatusCode,
+                                                    await response.Content.ReadAsStringAsync()));
+                                            }
+
+                                            Log.LogWarning(
+                                                "Failed to get response from '{0}', {1} retries remaining",
+                                                url,
+                                                retryCount);
+                                        }
                                     }
                                 }
-                                Log.LogMessage(
-                                    MessageImportance.Normal,
-                                    "Successfully sent notification to event hub path {0}.",
-                                    EventHubPath);
-                            }
 
+                            }
                         }
                     }
                 }

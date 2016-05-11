@@ -93,38 +93,58 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                 ContainerName);
 
             Log.LogMessage(MessageImportance.Normal, "Sending request to create Container");
-            using (HttpClient client = new HttpClient())
+            int retryCount = 15;
+            bool isOperationSuccess = false;
+            while (!isOperationSuccess)
             {
-                using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Put, url))
+                using (HttpClient client = new HttpClient())
                 {
-                    req.Headers.Add(AzureHelper.DateHeaderString, dt.ToString("R", CultureInfo.InvariantCulture));
-                    req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-                    req.Headers.Add(AzureHelper.AuthorizationHeaderString, AzureHelper.AuthorizationHeader(
-                            AccountName,
-                            AccountKey,
-                            "PUT",
-                            dt,
-                            req));
-                    byte[] bytestoWrite = new byte[0];
-                    int bytesToWriteLength = 0;
-
-                    Stream postStream = new MemoryStream();
-                    postStream.Write(bytestoWrite, 0, bytesToWriteLength);
-                    req.Content = new StreamContent(postStream);
-
-                    using (HttpResponseMessage response = await client.SendAsync(req))
+                    using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Put, url))
                     {
-                        this.Log.LogMessage(
-                            MessageImportance.Normal,
-                            "Received response to create Container {0}: Status Code: {1} {2}",
-                            this.ContainerName, response.StatusCode, response.Content);
+                        req.Headers.Add(AzureHelper.DateHeaderString, dt.ToString("R", CultureInfo.InvariantCulture));
+                        req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                        req.Headers.Add(
+                            AzureHelper.AuthorizationHeaderString,
+                            AzureHelper.AuthorizationHeader(AccountName, AccountKey, "PUT", dt, req));
+                        byte[] bytestoWrite = new byte[0];
+                        int bytesToWriteLength = 0;
+
+                        Stream postStream = new MemoryStream();
+                        postStream.Write(bytestoWrite, 0, bytesToWriteLength);
+                        req.Content = new StreamContent(postStream);
+
+                        using (HttpResponseMessage response = await client.SendAsync(req))
+                        {
+                            if (response.IsSuccessStatusCode)
+                            {
+                                this.Log.LogMessage(
+                                    MessageImportance.Normal,
+                                    "Received response to create Container {0}: Status Code: {1} {2}",
+                                    this.ContainerName,
+                                    response.StatusCode,
+                                    response.Content);
+                                isOperationSuccess = true;
+                            }
+                            else
+                            {
+                                if (retryCount-- <= 0)
+                                {
+                                    throw new AzureException(
+                                        string.Format(
+                                            "Failed to create Container {0}: Status Code: {1} {2}",
+                                            this.ContainerName, response.StatusCode, response.Content));
+                                }
+
+                                Log.LogWarning("Failed to get response from '{0}', {1} retries remaining", url, retryCount);
+                            }
+                        }
                     }
                 }
             }
 
             try
             {
-                if (ReadOnlyTokenDaysValid > 0)
+                if (ReadOnlyTokenDaysValid >= 0)
                 {
                     ReadOnlyToken = AzureHelper.CreateContainerSasToken(
                         AccountName,
@@ -135,10 +155,11 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                 }
                 else
                 {
-                    Log.LogWarning("{0} will not allow read permissions - ReadOnlyTokenDaysValid must be greater than 0.", StorageUri);
+                    //Including logging because ReadOnlyTokenDaysValid is an optional parameter
+                    Log.LogWarning("{0} will not allow read permissions - ReadOnlyTokenDaysValid must be greater than or equal to 0.", StorageUri);
                 }
 
-                if (WriteOnlyTokenDaysValid > 0)
+                if (WriteOnlyTokenDaysValid >= 0)
                 {
                     WriteOnlyToken = AzureHelper.CreateContainerSasToken(
                         AccountName,
@@ -149,7 +170,8 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                 }
                 else
                 {
-                    Log.LogWarning("{0} will not allow write permissions - WriteOnlyTokenDaysValid must be greater than 0.", StorageUri);
+                    //Including logging because WriteOnlyTokenDaysValid is an optional parameter
+                    Log.LogWarning("{0} will not allow write permissions - WriteOnlyTokenDaysValid must be than or equal to 0.", StorageUri);
                 }
             }
             catch (ArgumentOutOfRangeException e)

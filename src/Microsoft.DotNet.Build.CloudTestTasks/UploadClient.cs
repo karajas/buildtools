@@ -82,44 +82,71 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                     string blockUploadUrl = blobUploadUrl + "?comp=block&blockid=" + blockId;
 
                     DateTime dt = DateTime.UtcNow;
-                    using (HttpClient client = new HttpClient())
+                    int retryCount = 15;
+                    bool isOperationSuccess = false;
+                    while (!isOperationSuccess)
                     {
-                        client.DefaultRequestHeaders.Clear();
-                        using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Put, blockUploadUrl))
+                        using (HttpClient client = new HttpClient())
                         {
-                            req.Headers.Add(
-                                AzureHelper.DateHeaderString,
-                                dt.ToString("R", CultureInfo.InvariantCulture));
-                            req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-                            req.Headers.Add(
-                                AzureHelper.AuthorizationHeaderString,
-                                AzureHelper.AuthorizationHeader(
-                                    AccountName,
-                                    AccountKey,
-                                    "PUT",
-                                    dt,
-                                    req,
-                                    string.Empty,
-                                    string.Empty,
-                                    nextBytesToRead.ToString(),
-                                    string.Empty));
-
-                            log.LogMessage("Sending request to upload part {0} of file {1}", countForId, fileName);
-
-                            using (Stream postStream = new MemoryStream())
+                            client.DefaultRequestHeaders.Clear();
+                            using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Put, blockUploadUrl))
                             {
-                                postStream.Write(fileBytes, 0, nextBytesToRead);
-                                postStream.Seek(0, SeekOrigin.Begin);
-                                StreamContent contentStream = new StreamContent(postStream);
-                                req.Content = contentStream;
-                                using (HttpResponseMessage response = await client.SendAsync(req, ct))
+                                req.Headers.Add(
+                                    AzureHelper.DateHeaderString,
+                                    dt.ToString("R", CultureInfo.InvariantCulture));
+                                req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                                req.Headers.Add(
+                                    AzureHelper.AuthorizationHeaderString,
+                                    AzureHelper.AuthorizationHeader(
+                                        AccountName,
+                                        AccountKey,
+                                        "PUT",
+                                        dt,
+                                        req,
+                                        string.Empty,
+                                        string.Empty,
+                                        nextBytesToRead.ToString(),
+                                        string.Empty));
+
+                                log.LogMessage("Sending request to upload part {0} of file {1}", countForId, fileName);
+
+                                using (Stream postStream = new MemoryStream())
                                 {
-                                    this.log.LogMessage(
-                                        "Received response to upload part {0} of file {1}: Status Code:{2} Status Desc: {3}",
-                                        countForId,
-                                        fileName,
-                                        response.StatusCode,
-                                        await response.Content.ReadAsStringAsync());
+                                    postStream.Write(fileBytes, 0, nextBytesToRead);
+                                    postStream.Seek(0, SeekOrigin.Begin);
+                                    StreamContent contentStream = new StreamContent(postStream);
+                                    req.Content = contentStream;
+                                    using (HttpResponseMessage response = await client.SendAsync(req, ct))
+                                    {
+                                        if (response.IsSuccessStatusCode)
+                                        {
+                                            this.log.LogMessage(
+                                                "Received response to upload part {0} of file {1}: Status Code:{2} Status Desc: {3}",
+                                                countForId,
+                                                fileName,
+                                                response.StatusCode,
+                                                await response.Content.ReadAsStringAsync());
+                                            isOperationSuccess = true;
+                                        }
+                                        else
+                                        {
+                                            if (retryCount-- <= 0)
+                                            {
+                                                throw new AzureException(
+                                                string.Format(
+                                                    "Failed to upload part {0} of file {1}: Status Code: {2} {3}",
+                                                    countForId,
+                                                    fileName,
+                                                    response.StatusCode,
+                                                    response.Content));
+                                            }
+
+                                            this.log.LogWarning(
+                                                "Failed to get response from '{0}', {1} retries remaining",
+                                                blockUploadUrl,
+                                                retryCount);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -132,47 +159,73 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
 
             string blockListUploadUrl = blobUploadUrl + "?comp=blocklist";
             DateTime dt1 = DateTime.UtcNow;
-            using (HttpClient client = new HttpClient())
+            int retryBlockListCount = 15;
+            bool isBlockListOperationSuccess = false;
+            while (!isBlockListOperationSuccess)
             {
-                using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Put, blockListUploadUrl))
+                using (HttpClient client = new HttpClient())
                 {
-                    req.Headers.Add(AzureHelper.DateHeaderString, dt1.ToString("R", CultureInfo.InvariantCulture));
-                    req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-
-                    string body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BlockList>";
-                    foreach (object item in blockIds)
+                    using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Put, blockListUploadUrl))
                     {
-                        body += "<Latest>" + item + "</Latest>";
-                    }
+                        req.Headers.Add(AzureHelper.DateHeaderString, dt1.ToString("R", CultureInfo.InvariantCulture));
+                        req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
 
-                    body += "</BlockList>";
-                    byte[] bodyData = Encoding.UTF8.GetBytes(body);
-                    req.Headers.Add(
-                        AzureHelper.AuthorizationHeaderString,
-                        AzureHelper.AuthorizationHeader(
-                            AccountName,
-                            AccountKey,
-                            "PUT",
-                            dt1,
-                            req,
-                            string.Empty,
-                            string.Empty,
-                            bodyData.Length.ToString(),
-                            ""));
-                    using (Stream postStream = new MemoryStream())
-                    {
-                        postStream.Write(bodyData, 0, bodyData.Length);
-                        postStream.Seek(0, SeekOrigin.Begin);
-                        StreamContent contentStream = new StreamContent(postStream);
-                        req.Content = contentStream;
-
-                        using (HttpResponseMessage response = await client.SendAsync(req, ct))
+                        string body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BlockList>";
+                        foreach (object item in blockIds)
                         {
-                            this.log.LogMessage(
-                                "Received response to combine block list for file {0}: Status Code:{1} Status Desc: {2}",
-                                fileName,
-                                response.StatusCode,
-                                await response.Content.ReadAsStringAsync());
+                            body += "<Latest>" + item + "</Latest>";
+                        }
+
+                        body += "</BlockList>";
+                        byte[] bodyData = Encoding.UTF8.GetBytes(body);
+                        req.Headers.Add(
+                            AzureHelper.AuthorizationHeaderString,
+                            AzureHelper.AuthorizationHeader(
+                                AccountName,
+                                AccountKey,
+                                "PUT",
+                                dt1,
+                                req,
+                                string.Empty,
+                                string.Empty,
+                                bodyData.Length.ToString(),
+                                ""));
+                        using (Stream postStream = new MemoryStream())
+                        {
+                            postStream.Write(bodyData, 0, bodyData.Length);
+                            postStream.Seek(0, SeekOrigin.Begin);
+                            StreamContent contentStream = new StreamContent(postStream);
+                            req.Content = contentStream;
+
+                            using (HttpResponseMessage response = await client.SendAsync(req, ct))
+                            {
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    this.log.LogMessage(
+                                        "Received response to combine block list for file {0}: Status Code:{1} Status Desc: {2}",
+                                        fileName,
+                                        response.StatusCode,
+                                        await response.Content.ReadAsStringAsync());
+                                    isBlockListOperationSuccess = true;
+                                }
+                                else
+                                {
+                                    if (retryBlockListCount-- <= 0)
+                                    {
+                                        throw new AzureException(
+                                            string.Format(
+                                                "Failed to combine blocks for file {0}: Status Code: {1} {2}",
+                                                fileName,
+                                                response.StatusCode,
+                                                response.Content));
+                                    }
+
+                                    this.log.LogWarning(
+                                                "Failed to get response from '{0}', {1} retries remaining",
+                                                blockListUploadUrl,
+                                                retryBlockListCount);
+                                }
+                            }
                         }
                     }
                 }

@@ -89,49 +89,74 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
             DateTime dt = DateTime.UtcNow;
             HashSet<string> blobsPresent = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            using (HttpClient client = new HttpClient())
+            int retryCount = 15;
+            bool isOperationSuccess = false;
+            while (!isOperationSuccess)
             {
-                using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, checkListUrl))
+                using (HttpClient client = new HttpClient())
                 {
-                    req.Headers.Add(AzureHelper.DateHeaderString, dt.ToString("R", CultureInfo.InvariantCulture));
-                    req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-                    req.Headers.Add(AzureHelper.AuthorizationHeaderString, AzureHelper.AuthorizationHeader(
-                        AccountName,
-                        AccountKey,
-                        "GET",
-                        dt,
-                        req));
-                    
-                    Log.LogMessage(MessageImportance.Normal, "Sending request to check whether Container blobs exist");
-                    XmlDocument doc;
-                    using (HttpResponseMessage response = await client.SendAsync(req, ct))
+                    using (HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, checkListUrl))
                     {
-                        doc = new XmlDocument();
-                        doc.LoadXml(await response.Content.ReadAsStringAsync());
+                        req.Headers.Add(AzureHelper.DateHeaderString, dt.ToString("R", CultureInfo.InvariantCulture));
+                        req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                        req.Headers.Add(
+                            AzureHelper.AuthorizationHeaderString,
+                            AzureHelper.AuthorizationHeader(AccountName, AccountKey, "GET", dt, req));
+
+                        Log.LogMessage(
+                            MessageImportance.Normal,
+                            "Sending request to check whether Container blobs exist");
+                        XmlDocument doc = null;
+                        using (HttpResponseMessage response = await client.SendAsync(req, ct))
+                        {
+                            if (response.IsSuccessStatusCode)
+                            {
+                                doc = new XmlDocument();
+                                doc.LoadXml(await response.Content.ReadAsStringAsync());
+                                isOperationSuccess = true;
+                            }
+                            else
+                            {
+                                if (retryCount-- <= 0)
+                                {
+                                    throw new AzureException(
+                                        string.Format(
+                                            "Failed to check blobs on Container {0}: Status Code: {1} {2}",
+                                            ContainerName,
+                                            response.StatusCode,
+                                            response.Content));
+                                }
+                                Log.LogWarning(
+                                    "Failed to get response from '{0}', {1} retries remaining",
+                                    checkListUrl,
+                                    retryCount);
+                            }
+                        }
+
+                        XmlNodeList nodes = doc.DocumentElement.GetElementsByTagName("Blob");
+
+                        foreach (XmlNode node in nodes)
+                        {
+                            blobsPresent.Add(node["Name"].InnerText);
+                        }
+
+                        Log.LogMessage(
+                            MessageImportance.Normal,
+                            "Received response to check whether Container blobs exist");
                     }
-
-                    XmlNodeList nodes = doc.DocumentElement.GetElementsByTagName("Blob");
-
-                    foreach (XmlNode node in nodes)
-                    {
-                        blobsPresent.Add(node["Name"].InnerText);
-                    }
-
-                    Log.LogMessage(MessageImportance.Normal, "Received response to check whether Container blobs exist");
                 }
             }
             try
             {
                 await ThreadingTask.WhenAll(Items.Select(item => UploadAsync(ct, item, blobsPresent)));
+                Log.LogMessage(MessageImportance.High, "Upload to Azure is complete, a total of {0} items were uploaded.", Items.Length);
+                return true;
             }
             catch (Exception e)
             {
                 Log.LogErrorFromException(e,true);
                 return false;
             }
-
-            Log.LogMessage(MessageImportance.High, "Upload to Azure is complete, a total of {0} items were uploaded.", Items.Length);
-            return true;
         }
 
         private async ThreadingTask UploadAsync(CancellationToken ct, ITaskItem item, HashSet<string> blobsPresent)
@@ -164,7 +189,7 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
 
             if (!result)
             {
-                throw new Exception ("Task UploadToAzure failed.");
+                throw new AzureException("Task UploadToAzure failed.");
             }
             else
             {

@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Xml;
@@ -57,71 +58,125 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
             
             Log.LogMessage(MessageImportance.Normal, "Sending request to list blobsNames for container '{0}'.", ContainerName);
 
+           
             using (HttpClient client = new HttpClient())
             {
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, urlListBlobs))
+                int retryCount = 15;
+                bool isOperationSuccess = false;
+                while (!isOperationSuccess)
                 {
-                    try
+                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, urlListBlobs))
                     {
-                        request.Headers.Add(AzureHelper.DateHeaderString, dateTime.ToString("R", CultureInfo.InvariantCulture));
-                        request.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-                        request.Headers.Add(AzureHelper.AuthorizationHeaderString, AzureHelper.AuthorizationHeader(
-                                AccountName,
-                                AccountKey,
-                                "GET",
-                                dateTime,
-                                request));
-
-                        XmlDocument responseFile;
-                        using (HttpResponseMessage response = await client.SendAsync(request))
+                        try
                         {
-                            responseFile = new XmlDocument();
-                            responseFile.LoadXml(await response.Content.ReadAsStringAsync());
-                            XmlNodeList elemList = responseFile.GetElementsByTagName("Name");
+                            request.Headers.Add(
+                                AzureHelper.DateHeaderString,
+                                dateTime.ToString("R", CultureInfo.InvariantCulture));
+                            request.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                            request.Headers.Add(
+                                AzureHelper.AuthorizationHeaderString,
+                                AzureHelper.AuthorizationHeader(AccountName, AccountKey, "GET", dateTime, request));
 
-                            blobsNames = elemList.Cast<XmlNode>()
-                                                        .Select(x => x.InnerText)
-                                                        .ToList();
+                            XmlDocument responseFile;
+                            using (HttpResponseMessage response = await client.SendAsync(request))
+                            {
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    responseFile = new XmlDocument();
+                                    responseFile.LoadXml(await response.Content.ReadAsStringAsync());
+                                    XmlNodeList elemList = responseFile.GetElementsByTagName("Name");
+
+                                    blobsNames = elemList.Cast<XmlNode>().Select(x => x.InnerText).ToList();
+
+                                    isOperationSuccess = true;
+                                }
+                                else
+                                {
+                                    if (retryCount-- <= 0)
+                                    {
+                                        throw new AzureException(
+                                            string.Format(
+                                                "Failed to list blobsNames in {0}: Status Code: {1} {2}",
+                                                this.ContainerName,
+                                                response.StatusCode,
+                                                response.Content));
+                                    }
+
+                                    Log.LogWarning(
+                                        "Failed to get response from '{0}', {1} retries remaining",
+                                        urlListBlobs,
+                                        retryCount);
+                                }
+                            }
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        Log.LogError("Failed to retrieve information.\n" + e.Message);
-                        return false;
+                        catch (Exception e)
+                        {
+                            Log.LogError("Failed to retrieve information.\n" + e.Message);
+                            return false;
+                        }
                     }
                 }
 
-                DownloadDirectory = DownloadDirectory ?? Directory.GetCurrentDirectory();
-                foreach (string blob in blobsNames)
+                retryCount = 15;
+                isOperationSuccess = false;
+                while (!isOperationSuccess)
                 {
-                    Log.LogMessage(MessageImportance.Normal, "Downloading BLOB - {0}", blob);
-                    string urlGetBlob = string.Format("https://{0}.blob.core.windows.net/{1}/{2}", AccountName, ContainerName, blob);
-
-                    string filename = Path.Combine(DownloadDirectory, blob);
-                    string blobDirectory = blob.Substring(0, blob.LastIndexOf("/"));
-                    string downloadBlobDirectory = Path.Combine(DownloadDirectory, blobDirectory);
-                    if (!Directory.Exists(downloadBlobDirectory))
+                    DownloadDirectory = DownloadDirectory ?? Directory.GetCurrentDirectory();
+                    foreach (string blob in blobsNames)
                     {
-                        Directory.CreateDirectory(downloadBlobDirectory);
-                    }
+                        Log.LogMessage(MessageImportance.Normal, "Downloading BLOB - {0}", blob);
+                        string urlGetBlob = string.Format(
+                            "https://{0}.blob.core.windows.net/{1}/{2}",
+                            AccountName,
+                            ContainerName,
+                            blob);
 
-                    using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, urlGetBlob))
-                    {
-                        request.Headers.Add(AzureHelper.DateHeaderString, dateTime.ToString("R", CultureInfo.InvariantCulture));
-                        request.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
-                        request.Headers.Add(AzureHelper.AuthorizationHeaderString, AzureHelper.AuthorizationHeader(
-                                AccountName,
-                                AccountKey,
-                                "GET",
-                                dateTime,
-                                request));
-                        
-                        using (HttpResponseMessage response = await client.SendAsync(request))
+                        string filename = Path.Combine(DownloadDirectory, blob);
+                        string blobDirectory = blob.Substring(0, blob.LastIndexOf("/"));
+                        string downloadBlobDirectory = Path.Combine(DownloadDirectory, blobDirectory);
+                        if (!Directory.Exists(downloadBlobDirectory))
                         {
-                            Stream responseStream = await response.Content.ReadAsStreamAsync();
-                            using (FileStream sourceStream = File.Open(filename, FileMode.Create))
+                            Directory.CreateDirectory(downloadBlobDirectory);
+                        }
+
+                        using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, urlGetBlob))
+                        {
+                            request.Headers.Add(
+                                AzureHelper.DateHeaderString,
+                                dateTime.ToString("R", CultureInfo.InvariantCulture));
+                            request.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                            request.Headers.Add(
+                                AzureHelper.AuthorizationHeaderString,
+                                AzureHelper.AuthorizationHeader(AccountName, AccountKey, "GET", dateTime, request));
+
+                            using (HttpResponseMessage response = await client.SendAsync(request))
                             {
-                                responseStream.CopyTo(sourceStream);
+                                if (response.IsSuccessStatusCode)
+                                {
+                                    Stream responseStream = await response.Content.ReadAsStreamAsync();
+                                    using (FileStream sourceStream = File.Open(filename, FileMode.Create))
+                                    {
+                                        responseStream.CopyTo(sourceStream);
+                                    }
+                                    isOperationSuccess = true;
+                                }
+                                else
+                                {
+                                    if (retryCount-- <= 0)
+                                    {
+                                        throw new AzureException(
+                                        string.Format(
+                                            "Failed to download blob {0}: Status Code: {1} {2}",
+                                            blob,
+                                            response.StatusCode,
+                                            response.Content));
+                                    }
+
+                                    Log.LogWarning(
+                                        "Failed to get response from '{0}', {1} retries remaining",
+                                        urlGetBlob,
+                                        retryCount);
+                                }
                             }
                         }
                     }

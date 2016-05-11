@@ -279,4 +279,12 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
             return dictionary;
         }
     }
+    internal sealed class AzureException : Exception
+    {
+        public AzureException(string message)
+            : base(message)
+        {
+            
+        }
+    }
 }
