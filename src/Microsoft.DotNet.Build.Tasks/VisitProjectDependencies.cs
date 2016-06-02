@@ -16,6 +16,7 @@ namespace Microsoft.DotNet.Build.Tasks
 
         public static JObject ReadJsonFile(string projectJsonPath)
         {
+            Console.WriteLine(projectJsonPath);
             using (TextReader reader = File.OpenText(projectJsonPath))
             {
                 var projectJsonReader = new JsonTextReader(reader);

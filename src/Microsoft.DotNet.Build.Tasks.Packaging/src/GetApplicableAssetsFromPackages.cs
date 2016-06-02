@@ -73,18 +73,18 @@ namespace Microsoft.DotNet.Build.Tasks.Packaging
                 return false;
             }
 
-            if (this.TargetMonikers == null || this.TargetMonikers.Length == 0)
+            if (TargetMonikers == null || TargetMonikers.Length == 0)
             {
                 Log.LogError("TargetMoniker argument must be specified");
                 return false;
             }
 
-            NuGetFramework[] compileFxs = this.TargetMonikers.Select(fx => NuGetFramework.Parse(fx)).ToArray();
+            NuGetFramework[] compileFxs = TargetMonikers.Select(fx => NuGetFramework.Parse(fx)).ToArray();
             NuGetFramework[] runtimeFxs = compileFxs;
 
-            if (this.RuntimeTargetMonikers != null && this.TargetMonikers.Length > 0)
+            if (RuntimeTargetMonikers != null && RuntimeTargetMonikers.Length > 0)
             {
-                runtimeFxs = this.RuntimeTargetMonikers.Select(fx => NuGetFramework.Parse(fx)).ToArray();
+                runtimeFxs = RuntimeTargetMonikers.Select(fx => NuGetFramework.Parse(fx)).ToArray();
             }
 
             LoadFiles();

@@ -22,9 +22,13 @@
 
   <PropertyGroup>
     <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net45'">false</TestWithCore>
+    <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net451'">false</TestWithCore>
+    <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net452'">false</TestWithCore>
     <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net46'">false</TestWithCore>
     <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net461'">false</TestWithCore>
     <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net462'">false</TestWithCore>
+    <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'net463'">false</TestWithCore>
+    <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' == 'netcore50'">false</TestWithCore>
     <TestWithCore Condition="'$(TestWithCore)' == ''">true</TestWithCore>
   </PropertyGroup>
 
@@ -45,6 +49,9 @@
     <TestNugetTargetMoniker Include=".NETCoreApp,Version=v1.0" Condition="'$(TestTFM)' == 'netcoreapp1.0'">
       <Folder>netcoreapp1.0</Folder>
     </TestNugetTargetMoniker>
+    <TestNugetTargetMoniker Include=".NETFramework,Version=v4.6.3" Condition="'$(TestTFM)' == 'net463'">
+      <Folder>net462</Folder>
+    </TestNugetTargetMoniker>
     <TestNugetTargetMoniker Include=".NETFramework,Version=v4.6.2" Condition="'$(TestTFM)' == 'net462'">
       <Folder>net462</Folder>
     </TestNugetTargetMoniker>
@@ -58,6 +65,9 @@
       <Folder>net45</Folder>
     </TestNugetTargetMoniker>
     <TestNugetTargetMoniker Include=".NETFramework,Version=v4.5.1" Condition="'$(TestTFM)' == 'net451'">
+      <Folder>net451</Folder>
+    </TestNugetTargetMoniker>
+    <TestNugetTargetMoniker Include=".NETFramework,Version=v4.5.2" Condition="'$(TestTFM)' == 'net452'">
       <Folder>net451</Folder>
     </TestNugetTargetMoniker>
     <TestNugetTargetMoniker Include="UAP,Version=v10.0" Condition="'$(TestTFM)' == 'netcore50aot'">
