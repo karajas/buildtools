@@ -3,11 +3,12 @@
   <metadata minClientVersion="2.8.5">
     <id>Microsoft.xunit.extensibility.execution.netcore</id>
     <version>1.0.0-prerelease</version>
-    <title>xUnit Performance Dep for Perf</title>
-     <authors>Microsoft</authors>
+    <title>Redist of xunit.execution.execution to target netstandard1.0</title>
+    <authors>Microsoft</authors>
     <owners>Microsoft</owners>
     <description>
-        Extensions for the xunit-performance lib
+        This is a redisted package of xunit.extensibility.execution and it's dependencies for use 
+        in the xunit-perfomance library (github.com/Microsoft/xunit-performance)
     </description>
     <language>en-US</language>
     <projectUrl>https://github.com/Microsoft/xunit-performance</projectUrl>

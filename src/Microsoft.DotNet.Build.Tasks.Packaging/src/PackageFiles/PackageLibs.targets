@@ -32,7 +32,7 @@
        without requiring actual nupkgs, project.json, or restore -->
   <Target Name="ResolvePkgProjReferences" Condition="'@(PkgProjAsset)' != ''" DependsOnTargets="$(ResolvePkgProjReferencesDependsOn)">
     <GetApplicableAssetsFromPackages PackageAssets="@(PkgProjAsset)" 
-                                     TargetMonikers="@(NuGetTargetMoniker)"
+                                     TargetMonikers="$(NuGetTargetMoniker)"
                                      RuntimeTargetMonikers="@(TestNuGetTargetMoniker)"
                                      TargetRuntime="$(TestNugetRuntimeId)"
                                      RuntimeFile="$(RuntimeIdGraphDefinitionFile)">
