@@ -19,6 +19,6 @@
     </dependencies>
   </metadata>
   <files>
-    <file src="Microsoft.xunit.extensibility.execution.netcore\*.dll" target="lib/netstandard1.0" />
+    <file src="Microsoft.xunit.extensibility.execution.netcore\xunit.execution.dotnet.dll" target="lib/netstandard1.0" />
   </files>
 </package>
