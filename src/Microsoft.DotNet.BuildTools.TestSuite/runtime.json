@@ -63,6 +63,8 @@
                 "win10-x86-aot",
                 "win10-x64",
                 "win10-x64-aot",
+                "win10-arm",
+                "win10-arm-aot",
             ]
         },
         "coreFx.Test.netcoreapp1.0": {
