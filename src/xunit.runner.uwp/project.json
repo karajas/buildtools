@@ -1,0 +1,15 @@
+﻿{
+  "dependencies": {
+    "Microsoft.NETCore.UniversalWindowsPlatform": "5.2.0-rc4-3000440-00",
+    "Microsoft.DotNet.BuildTools.TestSuite": "1.0.0-prerelease-00508-01"
+  },
+  "frameworks": {
+    "netstandard1.3": {}
+  },
+  "runtimes": {
+    "win10-x86": {},
+    "win10-x86-aot": {},
+    "win10-x64": {},
+    "win10-x64-aot": {}
+  }
+}
