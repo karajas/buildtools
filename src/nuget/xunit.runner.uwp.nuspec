@@ -18,8 +18,7 @@
     </description>
     <copyright>Copyright © Microsoft Corporation</copyright>
     <dependencies>
-      <dependency id="xunit" version="2.1.0" />
-      <dependency id="xunit.runner.utility" version="2.1.0" />
+        <dependency id="System.IO.FileSystem" version="4.0.1" />
     </dependencies>
   </metadata>
   <files>
