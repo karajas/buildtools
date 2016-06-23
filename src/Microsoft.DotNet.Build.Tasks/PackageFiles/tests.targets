@@ -22,6 +22,7 @@
 
   <PropertyGroup>
     <TestWithCore Condition="'$(TestWithCore)' == '' And '$(TestTFM)' != 'netcoreapp1.0'">false</TestWithCore>
+    <TestAppX Condition="'$(TestWithCore)' == 'false' And '$(TestTFM)' == 'netcore50'">true</TestAppX>
     <TestWithCore Condition="'$(TestWithCore)' == '' ">true</TestWithCore>
   </PropertyGroup>
 
@@ -121,6 +122,10 @@
       <RunTestsForProjectInputs Include="@(_DebugSymbolsIntermediatePath)" />
       <RunTestsForProjectInputs Include="@(AllItemsFullPathWithTargetPath)" />
     </ItemGroup>
+    <Message Importance="High" Text="HEREISRUNTESTS: 1 @(ReferenceCopyLocalPaths)"/>
+    <Message Importance="High" Text="HEREISRUNTESTS: 2 @(Content)"/>
+    <Message Importance="High" Text="HEREISRUNTESTS: 3 @(AllItemsFullPathWithTargetPath)"/>
+    <Message Importance="High" Text="HEREISRUNTESTS: 4 @(IntermediateAssembly)"/>
   </Target>
 
   <!--
@@ -181,6 +186,18 @@
         <UseAbsolutePath Condition="'$(TestWithLocalLibraries)'=='true'">$([System.String]::Copy('%(_TestCopyLocalByFileNameWithoutDuplicates.SourcePath)').StartsWith('$(BinDir)'))</UseAbsolutePath>
       </IncludedFileForRunnerScript>
     </ItemGroup>
+    <Message Importance="High" Text="ASDF12 $(PackagesDir)" />
+    <Message Importance="High" Text="ASDF %(IncludedFileForRunnerScript.PackageRelativePath)" />
+    
+    <Copy SourceFiles="$(PackagesDir)%(IncludedFileForRunnerScript.PackageRelativePath)"
+          DestinationFiles="$(TestPath)$(TestNugetTargetMonikerFolder)\app\%(Filename)%(Extension)" 
+          SkipUnchangedFiles="true"/>
+    
+    
+    <Message Importance="High" Text="XVZCVZV unTestsForProjectInputs- '@(RunTestsForProjectInputs)'" />
+    
+     <Copy SourceFiles="@(RunTestsForProjectInputs)" 
+      DestinationFiles="@(RunTestsForProjectInputs->'$(TestPath)$(TestNugetTargetMonikerFolder)\app\%(Filename)%(Extension)')" />
     
     <MakeDir Directories="$(OutputFolderForTestDependencies)" />
     <PropertyGroup>

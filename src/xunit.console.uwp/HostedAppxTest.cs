@@ -110,9 +110,12 @@ namespace Xunit.UwpClient
                 else
                 {
                     Console.WriteLine("Using temp dir: " + tempDir);
+                    Console.WriteLine("KARTHIK UWP: " + Path.Combine(Directory.GetCurrentDirectory(), "app"));
+                    Console.WriteLine("KARTHIK UWP TO: " + Path.GetFullPath(tempDir));
                     RecurseCopy(Path.Combine(Directory.GetCurrentDirectory(), "app"), Path.GetFullPath(tempDir));
 
                     Console.WriteLine("Install Location: " + tempDir);
+                    Console.WriteLine("Assemblies copied " + project.Assemblies);
                     foreach (var a in project.Assemblies)
                     {
                         Console.WriteLine("Assembly to be tested: " + a.AssemblyFilename);
