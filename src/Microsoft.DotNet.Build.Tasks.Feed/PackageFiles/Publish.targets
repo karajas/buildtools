@@ -1,0 +1,33 @@
+<Project ToolsVersion="12.0" DefaultTargets="PublishOutputLeg" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <UsingTask TaskName="FeedActionTask" AssemblyFile="$(MSBuildThisFileDirectory)Microsoft.DotNet.Build.Tasks.Feed.dll"/>
+  
+    <!-- This is the standard publish target. It can be used to publish assets for the intermediate output of individual build legs and
+         the finalized output of an official build. 
+         This publish targets can be used to push to a type of feed. You must specify ... 
+        
+         FeedType - BlobFeed (this will enable pushing to Azure Blob Storage)
+         FeedAccountName - eg. https://storage.blob.core.windows.net/ (The link to the storage account in your Azure subscription)
+         FeedAccountKey - (The password from your Azure storage account from above)
+
+        PublishDependsOn can be customized at build time on the commandline to determine the pre steps required to publish 
+    -->
+
+    <Target Name="PublishOutputLeg" DependsOnTargets="@(PublishDependsOn)" >
+      <Error Text="The FeedType property must be set on the command line."  
+            Condition="'$(FeedType)' == ''" />  
+      <Error Text="The FeedAccountName property must be set on the command line."  
+            Condition="'$(FeedAccountName)' == ''" />  
+      <Error Text="The FeedAccountKey property must be set on the command line."  
+            Condition="'$(FeedAccountKey)' == ''" />
+      
+      <Message Importance="High" Text="Publish to $(FeedType):$(FeedAccountName) started" />
+      <FeedActionTask Task="Push"
+                      Type="$(FeedType)"
+                      FeedAccountName="$(FeedAccountName)"
+                      FeedAccountKey="$(FeedAccountKey)"
+                      ItemsToPublish="@(ItemsToPush)"
+                      RelativePath="$(RelativePath)"
+                      PublishFlatContainer="$(PublishFlatContainer)"
+                      Overwrite="$(Overwrite)" />
+    </Target>
+</Project>

@@ -45,7 +45,8 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
             string AccountKey,
             string ContainerName,
             string filePath,
-            string destinationBlob)
+            string destinationBlob,
+            string leaseId = "")
         {
             string resourceUrl = AzureHelper.GetContainerRestUrl(AccountName, ContainerName);
 
@@ -91,6 +92,10 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                                 AzureHelper.DateHeaderString, 
                                 dt.ToString("R", CultureInfo.InvariantCulture));
                             req.Headers.Add(AzureHelper.VersionHeaderString, AzureHelper.StorageApiVersion);
+                            if (!string.IsNullOrWhiteSpace(leaseId))
+                            {
+                                req.Headers.Add("x-ms-lease-id", leaseId);
+                            }
                             req.Headers.Add(
                                 AzureHelper.AuthorizationHeaderString,
                                 AzureHelper.AuthorizationHeader(
@@ -158,6 +163,10 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
 
                     body.Append("</BlockList>");
                     byte[] bodyData = Encoding.UTF8.GetBytes(body.ToString());
+                    if (!string.IsNullOrWhiteSpace(leaseId))
+                    {
+                        req.Headers.Add("x-ms-lease-id", leaseId);
+                    }
                     req.Headers.Add(
                         AzureHelper.AuthorizationHeaderString,
                         AzureHelper.AuthorizationHeader(
@@ -170,6 +179,7 @@ namespace Microsoft.DotNet.Build.CloudTestTasks
                             string.Empty,
                             bodyData.Length.ToString(),
                             string.Empty));
+                            
                     Stream postStream = new MemoryStream();
                     postStream.Write(bodyData, 0, bodyData.Length);
                     postStream.Seek(0, SeekOrigin.Begin);
