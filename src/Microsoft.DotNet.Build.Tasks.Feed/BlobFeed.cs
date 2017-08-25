@@ -102,14 +102,14 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
             GenerateRootServiceIndex(AccountName, relativePath);
             foreach (var package in items)
             {
-                Tuple<string, NuGetVersion> blobPath = CalculateBlobPath(package, relativePath);
+                Tuple<string, NuGetVersion> blobPath = CalculateBlobPath(package);
                 GeneratePackageServiceIndex(AccountName, Path.Combine(relativePath, blobPath.Item1), blobPath.Item2.ToFullString());
             }
             log.LogMessage(MessageImportance.Low, $"DONE generating indexes for {relativePath}");
             return Path.Combine(Directory.GetCurrentDirectory(), "tmp");
         }
 
-        public Tuple<string, NuGetVersion> CalculateBlobPath(string package, string relativePath)
+        public Tuple<string, NuGetVersion> CalculateBlobPath(string package)
         {
             using (var reader = new PackageArchiveReader(package))
             using (var nuspecStream = reader.GetNuspec())
@@ -193,18 +193,7 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
             {
                 if (items.Any(s => Path.GetExtension(item) != "nupkg" || !Path.GetFileName(s).Equals(Path.GetFileName(item))))
                 {
-                    return false;
-                }
-            }
-
-            //check package versions for improper updates to package version
-            string buildNumber = NuGetVersion.Parse(items.First()).ToFullString();
-
-            foreach (var item in items)
-            {
-                NuGetVersion version = NuGetVersion.Parse(item);
-                if (version.ToFullString() != buildNumber)
-                {
+                    log.LogError($"{item} is not a nupkg or duplicated.");
                     return false;
                 }
             }

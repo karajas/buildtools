@@ -16,7 +16,6 @@
       
       <Message Importance="High" Text="Configuring input feeds started" />
       <FeedActionTask Task="ConfigureInput"
-                      EnableFeeds="@(EnableFeeds)"
-                      DisableFeeds="@(DisableFeeds)" />
+                      EnableFeeds="@(EnableFeeds)" />
     </Target>
 </Project>

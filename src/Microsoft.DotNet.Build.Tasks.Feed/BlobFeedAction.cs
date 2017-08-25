@@ -57,47 +57,50 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
         }
 
         public async Task<bool> PushToFeed(IEnumerable<string> items, string relativePath = "", bool containerExists = false)
-        {            
-            if (containerExists)
+        {
+            if (feed.IsSanityChecked(items))
             {
-                if (Directory.Exists(DownloadDirectory))
+                if (containerExists)
                 {
-                    Directory.Delete(DownloadDirectory, true);
+                    if (Directory.Exists(DownloadDirectory))
+                    {
+                        Directory.Delete(DownloadDirectory, true);
+                    }
+                    Directory.CreateDirectory(DownloadDirectory);
+                    using (var clientThrottle = new SemaphoreSlim(this.MaxClients, this.MaxClients))
+                    {
+                        List<string> listAzureBlobs = await ListAzureBlobs(feed.AccountName, feed.AccountKey, feed.ContainerName);
+                        List<string> indexJsonBlobs = listAzureBlobs.FindAll(blob => blob.Contains("index.json"));
+
+                        // Merge index.json involves downloading the existing feed's index.jsons
+                        await Task.WhenAll(items.Select(item => MergeIndexes(CancellationToken, item, relativePath, indexJsonBlobs)));
+                    }
                 }
-                Directory.CreateDirectory(DownloadDirectory);
+                if (CancellationToken.IsCancellationRequested)
+                {
+                    Log.LogError("Task UploadToAzure cancelled");
+                    CancellationToken.ThrowIfCancellationRequested();
+                }
+
+                List<string> indexList = new List<string>(Directory.EnumerateFiles(Path.Combine(IndexDirectory, relativePath), "index.json", SearchOption.AllDirectories));
                 using (var clientThrottle = new SemaphoreSlim(this.MaxClients, this.MaxClients))
                 {
-                    List<string> listAzureBlobs = await ListAzureBlobs(feed.AccountName, feed.AccountKey, feed.ContainerName);
-                    List<string> indexJsonBlobs = listAzureBlobs.FindAll(blob => blob.Contains("index.json"));
+                    Func<string, string> calculatePath = (string item) =>
+                    {
+                        Tuple<string, NuGetVersion> blobPath = feed.CalculateBlobPath(item);
+                        string relativeBlobPath = Path.Combine(relativePath, blobPath.Item1, blobPath.Item2.ToFullString());
+                        return Path.Combine(relativeBlobPath, Path.GetFileName(item)).ToLowerInvariant();
+                    };
+                    //upload all items
+                    await Task.WhenAll(items.Select(item => UploadAsync(CancellationToken, item, calculatePath(item), clientThrottle)));
 
-                    // Merge index.json involves downloading the existing feed's index.jsons
-                    await Task.WhenAll(items.Select(item => MergeIndexes(CancellationToken, item, relativePath, indexJsonBlobs)));
+                    //upload equivalent index.jsons
+                    Func<string, string> calculateIndexPath = (string item) =>
+                    {
+                        return item.Substring(IndexDirectory.Length + 1).ToLowerInvariant();
+                    };
+                    await Task.WhenAll(indexList.Select(item => UploadAsync(CancellationToken, item, calculateIndexPath(item), clientThrottle)));
                 }
-            }
-            if (CancellationToken.IsCancellationRequested)
-            {
-                Log.LogError("Task UploadToAzure cancelled");
-                CancellationToken.ThrowIfCancellationRequested();
-            }
-
-            List<string> indexList = new List<string>(Directory.EnumerateFiles(Path.Combine(IndexDirectory, relativePath), "index.json", SearchOption.AllDirectories));
-            using (var clientThrottle = new SemaphoreSlim(this.MaxClients, this.MaxClients))
-            {
-                Func<string, string> calculatePath = (string item) =>
-                {
-                    Tuple<string, NuGetVersion> blobPath = feed.CalculateBlobPath(item, relativePath);
-                    string relativeBlobPath = Path.Combine(relativePath, blobPath.Item1, blobPath.Item2.ToFullString());
-                    return Path.Combine(relativeBlobPath, Path.GetFileName(item)).ToLowerInvariant();
-                };
-                //upload all items
-                await Task.WhenAll(items.Select(item => UploadAsync(CancellationToken, item, calculatePath(item), clientThrottle)));
-                
-                //upload equivalent index.jsons
-                Func<string, string> calculateIndexPath = (string item) =>
-                {
-                    return item.Substring(IndexDirectory.Length + 1).ToLowerInvariant();
-                };
-                await Task.WhenAll(indexList.Select(item => UploadAsync(CancellationToken, item, calculateIndexPath(item), clientThrottle)));
             }
 
             return !Log.HasLoggedErrors;
@@ -277,7 +280,7 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
         private async Task MergeIndexes(CancellationToken ct, string item, string relativePath, List<string> indexJsonList)
         {
             //pull equivalent index.json
-            Tuple<string, NuGetVersion> blobPath = feed.CalculateBlobPath(item, relativePath);
+            Tuple<string, NuGetVersion> blobPath = feed.CalculateBlobPath(item);
             string relativeBlobPath = Path.Combine(relativePath, blobPath.Item1).ToLowerInvariant().Replace("\\", "/");
             try
             {

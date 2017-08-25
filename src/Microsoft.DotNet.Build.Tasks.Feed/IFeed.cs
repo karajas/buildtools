@@ -22,8 +22,7 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
         //multiple version of a package or single version of a package
         string GenerateIndexes(IEnumerable<T> items, string relativePath);
 
-        //sanitize items to perform feed action on.
-        // maybe multiple version of a package or single version of a package
+        //quick sanity check on items to perform feed action on.
         bool IsSanityChecked(IEnumerable<T> items);
     }
 }

@@ -14,17 +14,15 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
         [Required]
         public ITaskItem[] EnableFeeds { get; set; }
 
-        public ITaskItem[] DisableFeeds { get; set; }
-
         public string RepoRoot { get; set; }
 
         public override bool Execute()
         {
-            GenerateNugetConfig(EnableFeeds, DisableFeeds, RepoRoot, Log);
+            GenerateNugetConfig(EnableFeeds, RepoRoot, Log);
             return !Log.HasLoggedErrors;
         }
 
-        public void GenerateNugetConfig(ITaskItem[] EnableFeeds, ITaskItem[] DisableFeeds, string RepoRoot, TaskLoggingHelper Log)
+        public void GenerateNugetConfig(ITaskItem[] EnableFeeds, string RepoRoot, TaskLoggingHelper Log)
         {
             if (string.IsNullOrWhiteSpace(RepoRoot)) {
                 RepoRoot = Directory.GetCurrentDirectory();
@@ -40,12 +38,6 @@ namespace Microsoft.DotNet.Build.Tasks.Feed
                 nugetConfigBody += $"<add key=\"inputFeed{i}\" value=\"{ EnableFeeds[i].ItemSpec }\" />{Environment.NewLine}";
             }
             nugetConfigBody += $"</packageSources>{Environment.NewLine}";
-            nugetConfigBody += $"<disabledPackageSources>{Environment.NewLine}";
-            for (int i = 0; i < DisableFeeds.Length; i++)
-            {
-                nugetConfigBody += $"<add key=\"disableFeed{i}\" value=\"{ DisableFeeds[i].ItemSpec }\" value=\"true\" />{Environment.NewLine}";
-            }
-            nugetConfigBody += $"</disabledPackageSources>{Environment.NewLine}";
             nugetConfigBody += $"</configuration>{Environment.NewLine}";
             using (StreamWriter swriter = new StreamWriter(File.Create(nugetConfigLocation)))
             {
