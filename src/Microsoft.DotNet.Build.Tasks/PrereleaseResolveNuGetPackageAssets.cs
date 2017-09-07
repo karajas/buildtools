@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using System.Security.Cryptography;
 using System.Reflection.PortableExecutable;
 using System.Reflection.Metadata;
+using System.Diagnostics;
 
 namespace Microsoft.DotNet.Build.Tasks
 {
@@ -213,6 +214,7 @@ namespace Microsoft.DotNet.Build.Tasks
         /// </summary>
         public override bool Execute()
         {
+            
             try
             {
                 ExecuteCore();
@@ -338,20 +340,23 @@ namespace Microsoft.DotNet.Build.Tasks
             }
 
             // We'll use as a fallback just the target moniker if the user didn't have the right runtime identifier in their lock file.
-            var target = GetTargetOrAttemptFallback(lockFile, needsRuntimeIdentifier: true);
+            var target = GetTargetOrAttemptFallback(lockFile, needsRuntimeIdentifier: true, log: true);
+            Console.WriteLine($"Debugging Target: {target}");
 
             HashSet<string> candidateNativeImplementations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             List<ITaskItem> runtimeWinMDItems = new List<ITaskItem>();
 
             foreach (var package in GetPackagesFromTarget(lockFile, target))
             {
+                Console.WriteLine($"Debugging GetCopyLocalItems - on package: {package.Id}");
+
                 foreach (var nativeItem in CreateItems(package, NuGetAssetTypeNative))
                 {
                     if (Path.GetExtension(nativeItem.ItemSpec).Equals(".dll", StringComparison.OrdinalIgnoreCase))
                     {
                         candidateNativeImplementations.Add(Path.GetFileNameWithoutExtension(nativeItem.ItemSpec));
                     }
-
+                    Console.WriteLine($"pulled out: {nativeItem}");
                     _copyLocalItems.Add(nativeItem);
                 }
 
@@ -674,15 +679,27 @@ namespace Microsoft.DotNet.Build.Tasks
         /// </summary>
         /// <param name="lockFile">The lock file JSON.</param>
         /// <param name="needsRuntimeIdentifier">Whether we must find targets that include the runtime identifier or one without the runtime identifier.</param>
-        private JObject GetTargetOrAttemptFallback(JObject lockFile, bool needsRuntimeIdentifier)
+        private JObject GetTargetOrAttemptFallback(JObject lockFile, bool needsRuntimeIdentifier, bool log =false)
         {
             var targets = (JObject)lockFile["targets"];
-
+            if (log)
+            {
+                Console.WriteLine($"Loaded targets {targets}");
+                List<ITaskItem> temp = TargetMonikers.ToList();
+                foreach (var i in temp) {
+                    Console.WriteLine($"Check monikers - {i.ItemSpec} ");
+                }
+            }
             foreach (var preferredTargetMoniker in TargetMonikers)
             {
+                if (log)
+                    Console.WriteLine($"Check tfmrid - {preferredTargetMoniker} ");
                 var preferredTargetMonikerWithOptionalRuntimeIdentifier = GetTargetMonikerWithOptionalRuntimeIdentifier(preferredTargetMoniker, needsRuntimeIdentifier);
+                if (log)
+                    Console.WriteLine($"Check tfmridwith - {preferredTargetMonikerWithOptionalRuntimeIdentifier} ");
                 var target = (JObject)targets[preferredTargetMonikerWithOptionalRuntimeIdentifier];
-
+                if (log)
+                    Console.WriteLine($"Check tfmridwithtarget - {target} ");
                 if (target != null)
                 {
                     return target;
@@ -809,7 +826,10 @@ namespace Microsoft.DotNet.Build.Tasks
                 {
                     targetPath = Path.Combine(culture, Path.GetFileName(file.Name));
                 }
-
+                if (key == "native")
+                {
+                    Console.WriteLine($"Karthik File Debug - {package.GetFullPathToFile(file.Name)}");
+                }
                 var item = CreateItem(package, package.GetFullPathToFile(file.Name), targetPath);
 
                 item.SetMetadata("Private", "false");
